@@ -1,4 +1,5 @@
 //! Definitions for FFI.
+//! 
 //! This has the main API defined, although there *may be* re-exports:
 //! - If the `auxlib` feature is enabled, then there will be definitions from
 //! `lauxlib.h`.
