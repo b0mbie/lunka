@@ -7,14 +7,14 @@
 //! `lualib.h`.
 //! 
 //! # Safety
-//! Functions that may raise errors *will not run any Rust drop glue*.
+//! Functions that raise an error *will not run any Rust drop glue upon doing so*.
 //! While it is possible to implement [`Result`] wrappers around those functions,
 //! doing so has a performance cost.
 //! Lua currently does not allow you to immediately catch API errors.
 //! 
 //! In unsafe code, if you are not sure whether Lua may raise an error:
 //! - do not make any allocations that aren't garbage-collected in Lua (such as
-//! with [`Box`](alloc::boxed::Box)), and
+//! with `Box`), and
 //! - do not use locks even with RAII guards, because they suffer from the same
 //! problem as non-Lua allocations.
 
@@ -212,7 +212,8 @@ c_int_enum! {
 		/// Also known as `LUA_ERRFILE`.
 		/// 
 		/// This is only present with the `auxlib` feature enabled, since this
-		/// status code is only used there for [`luaL_loadfilex`].
+		/// status code is only used there for
+		/// [`luaL_loadfilex`](crate::ffi::auxlib::luaL_loadfilex).
 		#[cfg(feature = "auxlib")]
 		FileError = 6,
 	}
@@ -363,7 +364,7 @@ pub type WarnFunction = unsafe extern "C" fn (
 );
 
 /// Default maximum size for the description of the source of a function in a
-/// [`Debug`].
+/// [`struct@Debug`].
 /// 
 /// Also known as `LUA_IDSIZE`.
 /// 
@@ -405,7 +406,7 @@ pub struct Debug<const ID_SIZE: usize> {
 /// Also known as `lua_Hook`.
 /// 
 /// The exact signature of this function depends on the size of
-/// `activation_record` behind a pointer - see [`Debug`].
+/// `activation_record` behind a pointer - see [`struct@Debug`].
 pub type Hook<const ID_SIZE: usize> = unsafe extern "C" fn (
 	l: *mut State, activation_record: *mut Debug<ID_SIZE>
 );
