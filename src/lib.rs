@@ -2,9 +2,9 @@
 
 #![no_std]
 
-pub mod ffi;
+pub mod cdef;
 
-pub use ffi::{
+pub use cdef::{
 	REGISTRY_INDEX,
 	Event,
 	HookMask,

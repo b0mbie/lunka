@@ -215,7 +215,7 @@ c_int_enum! {
 		/// 
 		/// This is only present with the `auxlib` feature enabled, since this
 		/// status code is only used there for
-		/// [`luaL_loadfilex`](crate::ffi::auxlib::luaL_loadfilex).
+		/// [`luaL_loadfilex`](crate::cdef::auxlib::luaL_loadfilex).
 		#[cfg(feature = "auxlib")]
 		FileError = 6,
 	}
@@ -226,7 +226,7 @@ impl ThreadStatus {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::ffi::ThreadStatus;
+	/// use lunka::cdef::ThreadStatus;
 	/// assert!(ThreadStatus::Ok.is_ok());
 	/// assert!(ThreadStatus::Yielded.is_ok());
 	/// assert!(!ThreadStatus::MemoryError.is_ok());
@@ -243,7 +243,7 @@ impl ThreadStatus {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::ffi::ThreadStatus;
+	/// use lunka::cdef::ThreadStatus;
 	/// assert!(ThreadStatus::Yielded.is_yield());
 	/// assert!(!ThreadStatus::Ok.is_yield());
 	/// ```
@@ -481,7 +481,7 @@ macro_rules! lua_state_func {
 	) => {
 		$(
 			$(#[$attr])*
-			$vis fn $name(l: *mut $crate::ffi::State $($param)*) $( -> $ret )?;
+			$vis fn $name(l: *mut $crate::cdef::State $($param)*) $( -> $ret )?;
 		)*
 	};
 }
