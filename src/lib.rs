@@ -10,7 +10,6 @@ pub use ffi::{
 	HookMask,
 	Number,
 	Integer,
-	ThreadStatus,
 	Unsigned,
 	upvalue_index
 };

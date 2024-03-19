@@ -18,4 +18,6 @@ auxlib = []
 # Include and use definitions for importing the standard libraries (in `lualib.h`).
 stdlibs = []
 
+default = [ "auxlib", "stdlibs" ]
+
 [dependencies]

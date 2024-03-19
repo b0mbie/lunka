@@ -27,6 +27,15 @@ use core::ffi::c_void;
 use core::mem::transmute;
 use core::ptr::null_mut;
 
+#[cfg(feature = "auxlib")]
+pub mod auxlib;
+
+#[cfg(feature = "stdlibs")]
+pub mod stdlibs;
+
+/// Lua version number.
+pub const VERSION_NUM: Number = 504 as _;
+
 /// Option for multiple returns in `lua_pcall` and `lua_call`.
 pub const MULT_RET: c_int = -1;
 
@@ -175,6 +184,7 @@ macro_rules! c_int_enum {
 		}
 	};
 }
+pub(crate) use c_int_enum;
 
 c_int_enum! {
 	/// Lua thread status.
@@ -198,6 +208,13 @@ c_int_enum! {
 		/// Encountered some error while handling an error.
 		/// Also known as `LUA_ERRERR`.
 		HandlerError = 5,
+		/// Encountered a file-related error.
+		/// Also known as `LUA_ERRFILE`.
+		/// 
+		/// This is only present with the `auxlib` feature enabled, since this
+		/// status code is only used there for [`luaL_loadfilex`].
+		#[cfg(feature = "auxlib")]
+		FileError = 6,
 	}
 }
 
@@ -353,7 +370,10 @@ pub type WarnFunction = unsafe extern "C" fn (
 /// This cannot be changed for Lua that's already compiled.
 pub const DEFAULT_ID_SIZE: usize = 60;
 
-/// Structure that Lua describes as an "activation record".
+/// Structure used to carry different pieces of information about a function or
+/// an activation record.
+/// 
+/// Also known as `lua_Debug`.
 /// 
 /// This structure is used in Lua debug hooks, and has some private data.
 /// The size of this structure in C code depends on the `LUA_IDSIZE` macro,
@@ -458,10 +478,11 @@ macro_rules! lua_state_func {
 	) => {
 		$(
 			$(#[$attr])*
-			$vis fn $name(l: *mut State $($param)*) $( -> $ret )?;
+			$vis fn $name(l: *mut $crate::ffi::State $($param)*) $( -> $ret )?;
 		)*
 	};
 }
+pub(crate) use lua_state_func;
 
 extern "C" {
 	pub fn lua_newstate(f: Alloc, ud: *mut c_void) -> *mut State;
