@@ -6,6 +6,8 @@ pub mod ffi;
 
 pub use ffi::{
 	REGISTRY_INDEX,
+	Event,
+	HookMask,
 	Number,
 	Integer,
 	ThreadStatus,
