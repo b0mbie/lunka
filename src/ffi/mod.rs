@@ -223,7 +223,7 @@ impl ThreadStatus {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::ThreadStatus;
+	/// use lunka::ffi::ThreadStatus;
 	/// assert!(ThreadStatus::Ok.is_ok());
 	/// assert!(ThreadStatus::Yielded.is_ok());
 	/// assert!(!ThreadStatus::MemoryError.is_ok());
@@ -240,7 +240,7 @@ impl ThreadStatus {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::ThreadStatus;
+	/// use lunka::ffi::ThreadStatus;
 	/// assert!(ThreadStatus::Yielded.is_yield());
 	/// assert!(!ThreadStatus::Ok.is_yield());
 	/// ```
