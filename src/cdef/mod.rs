@@ -495,6 +495,10 @@ extern "C" {
 
 	lua_state_func! {
 		pub fn lua_newthread(&mut self) -> *mut State;
+		pub fn lua_closethread(&mut self) -> c_int;
+		/// # Deprecated in Lua 5.4.6
+		/// Since Lua 5.4.6, this function is deprecated and [`lua_closethread`]
+		/// should be used instead.
 		pub fn lua_resetthread(&mut self) -> c_int;
 
 		pub fn lua_atpanic(
