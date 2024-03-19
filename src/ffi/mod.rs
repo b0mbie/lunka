@@ -85,7 +85,7 @@ pub use dependent::Integer;
 /// Also known as `lua_Unsigned`.
 /// 
 /// This type, effectively, is just [`Integer`], though unsigned.
-/// Refer to its documentation to learn more.
+/// Refer to its documentation.
 pub use dependent::Unsigned;
 
 /// Type of Lua numbers.
@@ -248,10 +248,14 @@ c_int_enum! {
 }
 
 /// Index in a Lua global state's registry where the main thread is stored.
+/// 
+/// TODO: Examples?
 pub const REGISTRY_MAIN_THREAD: c_int = 1;
 
 /// Index in a Lua global state's registry where the global environment is
 /// stored.
+/// 
+/// TODO: Examples?
 pub const REGISTRY_GLOBALS: c_int = 2;
 
 /// Last occupied index in a Lua global state's registry.
@@ -269,7 +273,8 @@ pub struct State {
 	_marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>
 }
 
-/// Type of C functions registered with Lua.
+/// C function registered with Lua.
+/// Also known as `lua_CFunction`.
 /// 
 /// This is still called a *C function*, because Rust has to speak the language
 /// of C to be able to use this.
@@ -281,28 +286,32 @@ pub struct State {
 /// TODO: Examples.
 pub type CFunction = unsafe extern "C" fn (l: *mut State) -> c_int;
 
-/// Type for continuation functions.
+/// Continuation function.
+/// Also known as `lua_KFunction`.
 /// 
 /// TODO: Documentation of what the parameters and return value mean, examples.
 pub type KFunction = unsafe extern "C" fn (
 	l: *mut State, status: c_int, ctx: KContext
 ) -> c_int;
 
-/// Type for functions that read blocks when loading Lua chunks.
+/// Function that reads blocks when loading Lua chunks.
+/// Also known as `lua_Reader`.
 /// 
 /// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Reader = unsafe extern "C" fn (
 	l: *mut State, ud: *mut c_void, sz: *mut usize
 ) -> *const c_char;
 
-/// Type for functions that write blocks when dumping Lua chunks.
+/// Function that writes blocks when dumping Lua chunks.
+/// Also known as `lua_Writer`.
 /// 
 /// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Writer = unsafe extern "C" fn (
 	l: *mut State, p: *const c_void, sz: usize, ud: *mut c_void
 ) -> *const c_char;
 
-/// Type for memory allocation functions.
+/// Memory allocation function.
+/// Also known as `lua_Alloc`.
 /// 
 /// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Alloc = unsafe extern "C" fn (
@@ -311,7 +320,8 @@ pub type Alloc = unsafe extern "C" fn (
 	nsize: usize
 ) -> *mut c_void;
 
-/// Type for warning handler functions.
+/// Warning handler function.
+/// Also known as `lua_WarnFunction`.
 /// 
 /// TODO: Explanation of parameters and their lifetimes, examples.
 pub type Warn = unsafe extern "C" fn (
