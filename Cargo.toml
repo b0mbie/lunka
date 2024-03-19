@@ -1,0 +1,21 @@
+[package]
+name = "lunka"
+description = "`#![no_std]` bindings to Lua 5.4"
+authors = [ "[aka]bomb" ]
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# Use definitions for 32 bits max.
+# This is analogous to the `LUA_32BITS` define, and should be set appropriately
+# depending on the compiled Lua settings.
+# It's usually set to `0`, so this is disabled by default.
+use-32-bits = []
+
+# Include and use stuff from `lauxlib.h`.
+auxlib = []
+
+# Include and use definitions for importing the standard libraries (in `lualib.h`).
+stdlibs = []
+
+[dependencies]
