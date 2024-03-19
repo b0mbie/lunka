@@ -142,6 +142,8 @@ pub const REGISTRY_INDEX: c_int = -MAX_STACK - 1000;
 
 /// Calculate a pseudo-index for the `i`-th upvalue, *starting from `1`*.
 /// 
+/// Equivalent to the `lua_upvalueindex` C macro.
+/// 
 /// Even with the above, this constant function will never panic.
 pub const fn upvalue_index(i: c_int) -> c_int {
 	REGISTRY_INDEX - i
