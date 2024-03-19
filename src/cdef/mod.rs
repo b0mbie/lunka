@@ -167,6 +167,21 @@ macro_rules! c_int_enum {
 			),*
 		}
 
+		impl $name {
+			/// Construct an instance of this enum from a [`c_int`], but without
+			/// checking if that value is valid.
+			/// 
+			/// # Safety
+			/// It is undefined behavior to use a value that doesn't correspond
+			/// to a valid variant.
+			pub const unsafe fn from_c_int_unchecked(value: c_int) -> Self {
+				match value {
+					$($def => Self::$variant,)*
+					_ => core::hint::unreachable_unchecked()
+				}
+			}
+		}
+
 		impl Into<c_int> for $name {
 			fn into(self) -> c_int {
 				self as c_int
