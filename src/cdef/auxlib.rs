@@ -11,21 +11,21 @@ use core::ptr::null;
 /// 
 /// This cannot be changed for Lua that's already compiled.
 pub const GLOBAL_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("_G\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"_G\0")
 };
 
 /// Key, in the registry, for the table of loaded modules.
 /// 
 /// This cannot be changed for Lua that's already compiled.
 pub const LOADED_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("_LOADED\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"_LOADED\0")
 };
 
 /// Key, in the registry, for the table of preloaded loaders.
 /// 
 /// This cannot be changed for Lua that's already compiled.
 pub const PRELOAD_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("_PRELOAD\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"_PRELOAD\0")
 };
 
 /// Type for arrays of functions to be registered by [`luaL_setfuncs`].

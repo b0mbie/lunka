@@ -4,39 +4,39 @@ use super::*;
 use core::ffi::CStr;
 
 pub const COROUTINE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("coroutine\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"coroutine\0")
 };
 
 pub const TABLE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("table\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"table\0")
 };
 
 pub const IO_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("io\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"io\0")
 };
 
 pub const OS_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("os\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"os\0")
 };
 
 pub const STRING_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("string\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"string\0")
 };
 
 pub const UTF8_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("utf8\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"utf8\0")
 };
 
 pub const MATH_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("math\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"math\0")
 };
 
 pub const DEBUG_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("debug\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"debug\0")
 };
 
 pub const PACKAGE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked("package\0".as_bytes())
+	CStr::from_bytes_with_nul_unchecked(b"package\0")
 };
 
 extern "C" {
