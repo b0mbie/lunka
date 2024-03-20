@@ -1,4 +1,5 @@
-//! Low-level, `#![no_std]` definitions for Lua 5.4.
+//! # lunka
+//! `#![no_std]` bindings to Lua 5.4.
 
 #![no_std]
 
