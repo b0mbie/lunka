@@ -994,7 +994,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(HookMask::empty().into_c_int(), 0);
 	/// ```
 	pub const fn empty() -> Self {
@@ -1010,7 +1010,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// unsafe {
 	/// 	assert_eq!(HookMask::from_c_int_unchecked(0), HookMask::empty());
 	/// }
@@ -1036,7 +1036,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(HookMask::empty().into_c_int(), 0);
 	/// ```
 	pub const fn into_c_int(self) -> c_int {
@@ -1047,7 +1047,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(
 	/// 	HookMask::empty().with_calls().into_c_int(),
 	/// 	HookMask::INT_CALL
@@ -1063,7 +1063,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(
 	/// 	HookMask::empty().with_returns().into_c_int(),
 	/// 	HookMask::INT_RETURN
@@ -1079,7 +1079,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(
 	/// 	HookMask::empty().with_lines().into_c_int(),
 	/// 	HookMask::INT_LINE
@@ -1096,7 +1096,7 @@ impl HookMask {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::HookMask;
+	/// use lunka::cdef::HookMask;
 	/// assert_eq!(
 	/// 	HookMask::empty().with_instructions().into_c_int(),
 	/// 	HookMask::INT_COUNT
