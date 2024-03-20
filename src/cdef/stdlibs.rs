@@ -41,18 +41,18 @@ pub const PACKAGE_LIB_NAME: &'static CStr = unsafe {
 
 extern "C" {
 	lua_state_func! {
-		pub fn luaopen_base(&mut self) -> c_int;
+		pub fn luaopen_base(self) -> c_int;
 
-		pub fn luaopen_coroutine(&mut self) -> c_int;
-		pub fn luaopen_table(&mut self) -> c_int;
-		pub fn luaopen_io(&mut self) -> c_int;
-		pub fn luaopen_os(&mut self) -> c_int;
-		pub fn luaopen_string(&mut self) -> c_int;
-		pub fn luaopen_utf8(&mut self) -> c_int;
-		pub fn luaopen_math(&mut self) -> c_int;
-		pub fn luaopen_debug(&mut self) -> c_int;
-		pub fn luaopen_package(&mut self) -> c_int;
+		pub fn luaopen_coroutine(self) -> c_int;
+		pub fn luaopen_table(self) -> c_int;
+		pub fn luaopen_io(self) -> c_int;
+		pub fn luaopen_os(self) -> c_int;
+		pub fn luaopen_string(self) -> c_int;
+		pub fn luaopen_utf8(self) -> c_int;
+		pub fn luaopen_math(self) -> c_int;
+		pub fn luaopen_debug(self) -> c_int;
+		pub fn luaopen_package(self) -> c_int;
 
-		pub fn luaL_openlibs(&mut self);
+		pub fn luaL_openlibs(self);
 	}
 }

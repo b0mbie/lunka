@@ -57,97 +57,97 @@ extern "C" {
 	pub fn luaL_newstate() -> *mut State;
 
 	lua_state_func! {
-		pub fn luaL_checkversion_(&mut self, ver: Number, sz: usize);
+		pub fn luaL_checkversion_(self, ver: Number, sz: usize);
 		pub fn luaL_getmetafield(
-			&mut self, obj: c_int, e: *const c_char
+			self, obj: c_int, e: *const c_char
 		) -> c_int;
-		pub fn luaL_callmeta(&mut self, obj: c_int, e: *const c_char) -> c_int;
+		pub fn luaL_callmeta(self, obj: c_int, e: *const c_char) -> c_int;
 		pub fn luaL_tolstring(
-			&mut self, idx: c_int, len: *mut usize
+			self, idx: c_int, len: *mut usize
 		) -> *const c_char;
-		pub fn luaL_argerror(&mut self, arg: c_int, extra_msg: *const c_char) -> !;
-		pub fn luaL_typeerror(&mut self, arg: c_int, type_name: *const c_char) -> !;
+		pub fn luaL_argerror(self, arg: c_int, extra_msg: *const c_char) -> !;
+		pub fn luaL_typeerror(self, arg: c_int, type_name: *const c_char) -> !;
 		pub fn luaL_checklstring(
-			&mut self, arg: c_int, len: *mut usize
+			self, arg: c_int, len: *mut usize
 		) -> *const c_char;
 		pub fn luaL_optlstring(
-			&mut self, arg: c_int, default: *const c_char, len: *mut usize
+			self, arg: c_int, default: *const c_char, len: *mut usize
 		) -> *const c_char;
-		pub fn luaL_checknumber(&mut self, arg: c_int) -> Number;
-		pub fn luaL_optnumber(&mut self, arg: c_int, default: Number) -> Number;
+		pub fn luaL_checknumber(self, arg: c_int) -> Number;
+		pub fn luaL_optnumber(self, arg: c_int, default: Number) -> Number;
 
-		pub fn luaL_checkinteger(&mut self, arg: c_int) -> Integer;
+		pub fn luaL_checkinteger(self, arg: c_int) -> Integer;
 		pub fn luaL_optinteger(
-			&mut self, arg: c_int, default: Integer
+			self, arg: c_int, default: Integer
 		) -> Integer;
 
-		pub fn luaL_checkstack(&mut self, sz: c_int, msg: *const c_char);
-		pub fn luaL_checktype(&mut self, arg: c_int, type_tag: c_int);
-		pub fn luaL_checkany(&mut self, arg: c_int);
+		pub fn luaL_checkstack(self, sz: c_int, msg: *const c_char);
+		pub fn luaL_checktype(self, arg: c_int, type_tag: c_int);
+		pub fn luaL_checkany(self, arg: c_int);
 
-		pub fn luaL_newmetatable(&mut self, type_name: *const c_char) -> c_int;
-		pub fn luaL_setmetatable(&mut self, type_name: *const c_char);
+		pub fn luaL_newmetatable(self, type_name: *const c_char) -> c_int;
+		pub fn luaL_setmetatable(self, type_name: *const c_char);
 		pub fn luaL_testudata(
-			&mut self, ud: c_int, type_name: *const c_char
+			self, ud: c_int, type_name: *const c_char
 		) -> *mut c_void;
 		pub fn luaL_checkudata(
-			&mut self, ud: c_int, type_name: *const c_char
+			self, ud: c_int, type_name: *const c_char
 		) -> *mut c_void;
 		
-		pub fn luaL_where(&mut self, level: c_int);
+		pub fn luaL_where(self, level: c_int);
 		/// # Note
 		/// The return type should be [`c_int`] judging from the C header,
 		/// however the documentation states that this function *never* returns.
 		/// 
 		/// See the manual for more information:
 		/// <https://www.lua.org/manual/5.4/manual.html#luaL_error>
-		pub fn luaL_error(&mut self, fmt: *const c_char, ...) -> !;
+		pub fn luaL_error(self, fmt: *const c_char, ...) -> !;
 
 		pub fn luaL_checkoption(
-			&mut self, arg: c_int, default: *const c_char,
+			self, arg: c_int, default: *const c_char,
 			list: *const *const c_char
 		) -> c_int;
 
 		pub fn luaL_fileresult(
-			&mut self, status: c_int, file_name: *const c_char
+			self, status: c_int, file_name: *const c_char
 		) -> c_int;
-		pub fn luaL_execresult(&mut self, status: c_int) -> c_int;
+		pub fn luaL_execresult(self, status: c_int) -> c_int;
 
-		pub fn luaL_ref(&mut self, table: c_int) -> c_int;
-		pub fn luaL_unref(&mut self, table: c_int, ref_idx: c_int);
+		pub fn luaL_ref(self, table: c_int) -> c_int;
+		pub fn luaL_unref(self, table: c_int, ref_idx: c_int);
 
 		pub fn luaL_loadfilex(
-			&mut self, file_name: *const c_char, mode: *const c_char
+			self, file_name: *const c_char, mode: *const c_char
 		) -> c_int;
 
 		pub fn luaL_loadbufferx(
-			&mut self,
+			self,
 			buffer: *const c_char, buffer_sz: usize,
 			name: *const c_char,
 			mode: *const c_char
 		) -> c_int;
-		pub fn luaL_loadstring(&mut self, code: *const c_char) -> c_int;
+		pub fn luaL_loadstring(self, code: *const c_char) -> c_int;
 
-		pub fn luaL_len(&self, idx: c_int) -> Integer;
+		pub fn luaL_len(self, idx: c_int) -> Integer;
 
 		pub fn luaL_gsub(
-			&mut self,
+			self,
 			haystack: *const c_char,
 			needle: *const c_char, replacement: *const c_char
 		) -> *const c_char;
 
-		pub fn luaL_setfuncs(&mut self, list: *const Reg, n_upvalues: c_int);
+		pub fn luaL_setfuncs(self, list: *const Reg, n_upvalues: c_int);
 		pub fn luaL_getsubtable(
-			&mut self, idx: c_int, table_name: *const c_char
+			self, idx: c_int, table_name: *const c_char
 		) -> c_int;
 
 		pub fn luaL_traceback(
-			&mut self, of: *mut State,
+			self, of: *mut State,
 			message: *const c_char, level: c_int
 		);
 
 		pub fn luaL_requiref(
-			&mut self, module_name: *const c_char,
+			self, module_name: *const c_char,
 			open_fn: CFunction, into_global: c_int
 		);
 	}

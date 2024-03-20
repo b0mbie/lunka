@@ -246,7 +246,7 @@ impl ThreadStatus {
 	/// assert!(ThreadStatus::Yielded.is_ok());
 	/// assert!(!ThreadStatus::MemoryError.is_ok());
 	/// ```
-	pub const fn is_ok(&self) -> bool {
+	pub const fn is_ok(self) -> bool {
 		match self {
 			Self::Ok => true,
 			Self::Yielded => true,
@@ -262,7 +262,7 @@ impl ThreadStatus {
 	/// assert!(ThreadStatus::Yielded.is_yield());
 	/// assert!(!ThreadStatus::Ok.is_yield());
 	/// ```
-	pub const fn is_yield(&self) -> bool {
+	pub const fn is_yield(self) -> bool {
 		match self {
 			Self::Yielded => true,
 			_ => false
@@ -491,7 +491,7 @@ macro_rules! lua_state_func {
 	(
 		$(
 			$(#[$attr:meta])*
-			$vis:vis fn $name:ident(& $(mut)? self $($param:tt)*) $( -> $ret:ty )?;
+			$vis:vis fn $name:ident(self $($param:tt)*) $( -> $ret:ty )?;
 		)*
 	) => {
 		$(
@@ -509,122 +509,118 @@ extern "C" {
 	pub fn lua_xmove(from: *mut State, to: *mut State, n: c_int);
 
 	lua_state_func! {
-		pub fn lua_newthread(&mut self) -> *mut State;
-		pub fn lua_closethread(&mut self, from: *mut State) -> c_int;
+		pub fn lua_newthread(self) -> *mut State;
+		pub fn lua_closethread(self, from: *mut State) -> c_int;
 		/// # Deprecated in Lua 5.4.6
 		/// Since Lua 5.4.6, this function is deprecated and [`lua_closethread`]
 		/// should be used instead.
-		pub fn lua_resetthread(&mut self) -> c_int;
+		pub fn lua_resetthread(self) -> c_int;
 
 		pub fn lua_atpanic(
-			&mut self, panicf: Option<CFunction>
+			self, panicf: Option<CFunction>
 		) -> Option<CFunction>;
 
-		pub fn lua_version(&self) -> Number;
+		pub fn lua_version(self) -> Number;
 	
-		pub fn lua_absindex(&self, idx: c_int) -> c_int;
-		pub fn lua_gettop(&self) -> c_int;
-		pub fn lua_settop(&mut self, idx: c_int);
-		pub fn lua_pushvalue(&mut self, idx: c_int);
-		pub fn lua_rotate(&mut self, idx: c_int, n: c_int);
-		pub fn lua_copy(&mut self, from_idx: c_int, to_idx: c_int);
-		pub fn lua_checkstack(&self, n: c_int) -> c_int;
+		pub fn lua_absindex(self, idx: c_int) -> c_int;
+		pub fn lua_gettop(self) -> c_int;
+		pub fn lua_settop(self, idx: c_int);
+		pub fn lua_pushvalue(self, idx: c_int);
+		pub fn lua_rotate(self, idx: c_int, n: c_int);
+		pub fn lua_copy(self, from_idx: c_int, to_idx: c_int);
+		pub fn lua_checkstack(self, n: c_int) -> c_int;
 
-		pub fn lua_isnumber(&self, idx: c_int) -> c_int;
-		pub fn lua_isstring(&self, idx: c_int) -> c_int;
-		pub fn lua_iscfunction(&self, idx: c_int) -> c_int;
-		pub fn lua_isinteger(&self, idx: c_int) -> c_int;
-		pub fn lua_isuserdata(&self, idx: c_int) -> c_int;
-		pub fn lua_type(&self, idx: c_int) -> c_int;
-		pub fn lua_typename(&self, type_tag: c_int) -> *const c_char;
+		pub fn lua_isnumber(self, idx: c_int) -> c_int;
+		pub fn lua_isstring(self, idx: c_int) -> c_int;
+		pub fn lua_iscfunction(self, idx: c_int) -> c_int;
+		pub fn lua_isinteger(self, idx: c_int) -> c_int;
+		pub fn lua_isuserdata(self, idx: c_int) -> c_int;
+		pub fn lua_type(self, idx: c_int) -> c_int;
+		pub fn lua_typename(self, type_tag: c_int) -> *const c_char;
 
-		pub fn lua_tonumberx(
-			&mut self, idx: c_int, is_num: *mut c_int
-		) -> Number;
-		pub fn lua_tointegerx(
-			&mut self, idx: c_int, is_num: *mut c_int
-		) -> Integer;
-		pub fn lua_toboolean(&mut self, idx: c_int) -> c_int;
+		pub fn lua_tonumberx(self, idx: c_int, is_num: *mut c_int) -> Number;
+		pub fn lua_tointegerx(self, idx: c_int, is_num: *mut c_int) -> Integer;
+		pub fn lua_toboolean(self, idx: c_int) -> c_int;
 		pub fn lua_tolstring(
-			&mut self, idx: c_int, len: *mut usize
+			self, idx: c_int, len: *mut usize
 		) -> *const c_char;
-		pub fn lua_rawlen(&mut self, idx: c_int) -> Unsigned;
-		pub fn lua_tocfunction(&self, idx: c_int) -> Option<CFunction>;
-		pub fn lua_touserdata(&self, idx: c_int) -> *mut c_void;
-		pub fn lua_tothread(&self, idx: c_int) -> *mut State;
-		pub fn lua_topointer(&self, idx: c_int) -> *const c_void;
+		pub fn lua_rawlen(self, idx: c_int) -> Unsigned;
+		pub fn lua_tocfunction(self, idx: c_int) -> Option<CFunction>;
+		pub fn lua_touserdata(self, idx: c_int) -> *mut c_void;
+		pub fn lua_tothread(self, idx: c_int) -> *mut State;
+		pub fn lua_topointer(self, idx: c_int) -> *const c_void;
 
-		pub fn lua_arith(&mut self, op: c_int);
-		pub fn lua_rawequal(&mut self, idx1: c_int, idx2: c_int) -> c_int;
+		pub fn lua_arith(self, op: c_int);
+		pub fn lua_rawequal(self, idx_a: c_int, idx_b: c_int) -> c_int;
 		pub fn lua_compare(
-			&mut self,
-			idx1: c_int, idx2: c_int,
+			self,
+			idx_a: c_int, idx_b: c_int,
 			op: c_int
 		) -> c_int;
 
-		pub fn lua_pushnil(&mut self);
-		pub fn lua_pushnumber(&mut self, n: Number);
-		pub fn lua_pushinteger(&mut self, n: Integer);
+		pub fn lua_pushnil(self);
+		pub fn lua_pushnumber(self, n: Number);
+		pub fn lua_pushinteger(self, n: Integer);
 		pub fn lua_pushlstring(
-			&mut self, s: *const c_char, len: usize
+			self, s: *const c_char, len: usize
 		) -> *const c_char;
-		pub fn lua_pushstring(&mut self, s: *const c_char) -> *const c_char;
+		pub fn lua_pushstring(self, s: *const c_char) -> *const c_char;
 		// Can't create `VaList`s...
 		pub fn lua_pushvfstring(
-			&mut self, fmt: *const c_char, argp: *mut c_void
+			self, fmt: *const c_char, argp: *mut c_void
 		) -> *const c_char;
 		pub fn lua_pushfstring(
-			&mut self, fmt: *const c_char, ...
+			self, fmt: *const c_char, ...
 		) -> *const c_char;
-		pub fn lua_pushcclosure(&mut self, func: CFunction, n: c_int);
-		pub fn lua_pushboolean(&mut self, b: c_int);
-		pub fn lua_pushlightuserdata(&mut self, p: *mut c_void);
-		pub fn lua_pushthread(&mut self) -> c_int;
+		pub fn lua_pushcclosure(self, func: CFunction, n: c_int);
+		pub fn lua_pushboolean(self, b: c_int);
+		pub fn lua_pushlightuserdata(self, p: *mut c_void);
+		pub fn lua_pushthread(self) -> c_int;
 
-		pub fn lua_getglobal(&mut self, name: *const c_char) -> c_int;
-		pub fn lua_gettable(&mut self, idx: c_int) -> c_int;
-		pub fn lua_getfield(&mut self, idx: c_int, k: *const c_char) -> c_int;
-		pub fn lua_geti(&mut self, idx: c_int, n: Integer) -> c_int;
-		pub fn lua_rawget(&mut self, idx: c_int) -> c_int;
-		pub fn lua_rawgeti(&mut self, idx: c_int, n: Integer) -> c_int;
-		pub fn lua_rawgetp(&mut self, idx: c_int, p: *const c_void) -> c_int;
+		pub fn lua_getglobal(self, name: *const c_char) -> c_int;
+		pub fn lua_gettable(self, idx: c_int) -> c_int;
+		pub fn lua_getfield(self, idx: c_int, k: *const c_char) -> c_int;
+		pub fn lua_geti(self, idx: c_int, n: Integer) -> c_int;
+		pub fn lua_rawget(self, idx: c_int) -> c_int;
+		pub fn lua_rawgeti(self, idx: c_int, n: Integer) -> c_int;
+		pub fn lua_rawgetp(self, idx: c_int, p: *const c_void) -> c_int;
 
-		pub fn lua_createtable(&mut self, n_arr: c_int, n_rec: c_int);
+		pub fn lua_createtable(self, n_arr: c_int, n_rec: c_int);
 		pub fn lua_newuserdatauv(
-			&mut self, sz: usize, n_uvalue: c_int
+			self, sz: usize, n_uvalue: c_int
 		) -> *mut c_void;
-		pub fn lua_getmetatable(&mut self, obj_index: c_int) -> c_int;
-		pub fn lua_getiuservalue(&mut self, idx: c_int, n: c_int) -> c_int;
+		pub fn lua_getmetatable(self, obj_index: c_int) -> c_int;
+		pub fn lua_getiuservalue(self, idx: c_int, n: c_int) -> c_int;
 
-		pub fn lua_setglobal(&mut self, name: *const c_char);
-		pub fn lua_settable(&mut self, idx: c_int);
-		pub fn lua_setfield(&mut self, idx: c_int, k: *const c_char);
-		pub fn lua_seti(&mut self, idx: c_int, n: Integer);
-		pub fn lua_rawset(&mut self, idx: c_int);
-		pub fn lua_rawseti(&mut self, idx: c_int, n: Integer);
-		pub fn lua_rawsetp(&mut self, idx: c_int, p: *const c_void);
-		pub fn lua_setmetatable(&mut self, obj_index: c_int) -> c_int;
-		pub fn lua_setiuservalue(&mut self, idx: c_int, n: c_int) -> c_int;
+		pub fn lua_setglobal(self, name: *const c_char);
+		pub fn lua_settable(self, idx: c_int);
+		pub fn lua_setfield(self, idx: c_int, k: *const c_char);
+		pub fn lua_seti(self, idx: c_int, n: Integer);
+		pub fn lua_rawset(self, idx: c_int);
+		pub fn lua_rawseti(self, idx: c_int, n: Integer);
+		pub fn lua_rawsetp(self, idx: c_int, p: *const c_void);
+		pub fn lua_setmetatable(self, obj_index: c_int) -> c_int;
+		pub fn lua_setiuservalue(self, idx: c_int, n: c_int) -> c_int;
 
 		pub fn lua_callk(
-			&mut self,
+			self,
 			n_args: c_int, n_results: c_int,
 			ctx: KContext, k: Option<KFunction>
 		);
 		pub fn lua_pcallk(
-			&mut self,
+			self,
 			n_args: c_int, n_results: c_int,
 			err_func: c_int,
 			ctx: KContext, k: Option<KFunction>
 		) -> c_int;
 		pub fn lua_load(
-			&mut self,
+			self,
 			reader: Reader, dt: *mut c_void,
 			chunk_name: *const c_char,
 			mode: *const c_char
 		) -> c_int;
 		pub fn lua_dump(
-			&mut self,
+			self,
 			writer: Writer, data: *mut c_void,
 			strip: c_int
 		) -> c_int;
@@ -640,7 +636,7 @@ extern "C" {
 		/// See the manual for more information:
 		/// <https://www.lua.org/manual/5.4/manual.html#lua_yieldk>
 		pub fn lua_yieldk(
-			&mut self,
+			self,
 			n_results: c_int,
 			ctx: KContext, k: Option<KFunction>
 		) -> !;
@@ -658,23 +654,23 @@ extern "C" {
 		#[allow(clashing_extern_declarations)]
 		#[link_name = "lua_yieldk"]
 		pub fn lua_yieldk_in_hook(
-			&mut self,
+			self,
 			n_results: c_int,
 			ctx: KContext, k: Option<KFunction>
 		) -> c_int;
 
 		pub fn lua_resume(
-			&mut self, from: *mut State,
+			self, from: *mut State,
 			n_arg: c_int,
 			n_res: *mut c_int
 		) -> c_int;
-		pub fn lua_status(&self) -> c_int;
-		pub fn lua_isyieldable(&self) -> c_int;
+		pub fn lua_status(self) -> c_int;
+		pub fn lua_isyieldable(self) -> c_int;
 
-		pub fn lua_setwarnf(&mut self, f: Option<WarnFunction>, ud: *mut c_void);
-		pub fn lua_warning(&mut self, msg: *const c_char, to_cont: c_int);
+		pub fn lua_setwarnf(self, f: Option<WarnFunction>, ud: *mut c_void);
+		pub fn lua_warning(self, msg: *const c_char, to_cont: c_int);
 
-		pub fn lua_gc(&mut self, what: c_int, ...) -> c_int;
+		pub fn lua_gc(self, what: c_int, ...) -> c_int;
 
 		/// # Note
 		/// The return type should be [`c_int`] judging from the C header,
@@ -682,41 +678,41 @@ extern "C" {
 		/// 
 		/// See the manual for more information:
 		/// <https://www.lua.org/manual/5.4/manual.html#lua_error>
-		pub fn lua_error(&mut self) -> !;
+		pub fn lua_error(self) -> !;
 
-		pub fn lua_next(&mut self, idx: c_int) -> c_int;
+		pub fn lua_next(self, idx: c_int) -> c_int;
 
-		pub fn lua_concat(&mut self, n: c_int);
-		pub fn lua_len(&mut self, idx: c_int);
+		pub fn lua_concat(self, n: c_int);
+		pub fn lua_len(self, idx: c_int);
 	
-		pub fn lua_stringtonumber(&mut self, s: *const c_char) -> usize;
+		pub fn lua_stringtonumber(self, s: *const c_char) -> usize;
 
-		pub fn lua_getallocf(&self, ud: *mut *mut c_void) -> Alloc;
-		pub fn lua_setallocf(&mut self, f: Alloc, ud: *mut c_void);
+		pub fn lua_getallocf(self, ud: *mut *mut c_void) -> Alloc;
+		pub fn lua_setallocf(self, f: Alloc, ud: *mut c_void);
 
-		pub fn lua_toclose(&mut self, idx: c_int);
-		pub fn lua_closeslot(&mut self, idx: c_int);
+		pub fn lua_toclose(self, idx: c_int);
+		pub fn lua_closeslot(self, idx: c_int);
 
 		pub fn lua_getupvalue(
-			&self, func_index: c_int, n: c_int
+			self, func_index: c_int, n: c_int
 		) -> *const c_char;
 		pub fn lua_setupvalue(
-			&self, func_index: c_int, n: c_int
+			self, func_index: c_int, n: c_int
 		) -> *const c_char;
 
 		pub fn lua_upvalueid(
-			&self, func_index: c_int, n: c_int
+			self, func_index: c_int, n: c_int
 		) -> *mut c_void;
 		pub fn lua_upvaluejoin(
-			&self,
-			func_1_index: c_int, n_1: c_int,
-			func_2_index: c_int, n_2: c_int
+			self,
+			func_into_index: c_int, n_into: c_int,
+			func_from_index: c_int, n_from: c_int
 		) -> *const c_char;
 
-		pub fn lua_gethookmask(&self) -> c_int;
-		pub fn lua_gethookcount(&self) -> c_int;
+		pub fn lua_gethookmask(self) -> c_int;
+		pub fn lua_gethookcount(self) -> c_int;
 	
-		pub fn lua_setcstacklimit(&mut self, limit: c_uint) -> c_int;
+		pub fn lua_setcstacklimit(self, limit: c_uint) -> c_int;
 	}
 
 	// These are used internally for Rust functions which can accept a const
