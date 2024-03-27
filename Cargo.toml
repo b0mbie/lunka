@@ -21,3 +21,4 @@ stdlibs = []
 default = [ "auxlib", "stdlibs" ]
 
 [dependencies]
+allocator-api2 = "0.2.16"

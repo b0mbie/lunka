@@ -580,7 +580,7 @@ extern "C" {
 		pub fn lua_getglobal(self, name: *const c_char) -> c_int;
 		pub fn lua_gettable(self, idx: c_int) -> c_int;
 		pub fn lua_getfield(self, idx: c_int, k: *const c_char) -> c_int;
-		pub fn lua_geti(self, idx: c_int, n: Integer) -> c_int;
+		pub fn lua_geti(self, idx: c_int, i: Integer) -> c_int;
 		pub fn lua_rawget(self, idx: c_int) -> c_int;
 		pub fn lua_rawgeti(self, idx: c_int, n: Integer) -> c_int;
 		pub fn lua_rawgetp(self, idx: c_int, p: *const c_void) -> c_int;
