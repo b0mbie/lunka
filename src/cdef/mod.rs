@@ -205,6 +205,10 @@ pub(crate) use c_int_enum;
 
 c_int_enum! {
 	/// Lua thread status.
+	/// 
+	/// This status usually indicates a success or some sort of failure in the
+	/// form of a caught raised error.
+	/// Read more about errors in the [documentation](crate::errors).
 	#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 	pub enum ThreadStatus {
 		/// No errors.
@@ -268,6 +272,38 @@ impl ThreadStatus {
 			_ => false
 		}
 	}
+
+	pub fn then<T>(self, func: impl FnOnce(Self) -> T) -> Option<T> {
+		match self {
+			Self::Ok => Some(func(self)),
+			Self::Yielded => Some(func(self)),
+			_ => None
+		}
+	}
+
+	pub fn then_some<T>(self, value: T) -> Option<T> {
+		match self {
+			Self::Ok => Some(value),
+			Self::Yielded => Some(value),
+			_ => None
+		}
+	}
+
+	pub fn or_else<E>(self, func: impl FnOnce(Self) -> E) -> Result<(), E> {
+		match self {
+			Self::Ok => Ok(()),
+			Self::Yielded => Ok(()),
+			_ => Err(func(self))
+		}
+	}
+
+	pub fn or<E>(self, err: E) -> Result<(), E> {
+		match self {
+			Self::Ok => Ok(()),
+			Self::Yielded => Ok(()),
+			_ => Err(err)
+		}
+	}
 }
 
 c_int_enum! {
@@ -300,14 +336,10 @@ c_int_enum! {
 }
 
 /// Index in a Lua global state's registry where the main thread is stored.
-/// 
-/// TODO: Examples?
 pub const REGISTRY_MAIN_THREAD: Integer = 1;
 
 /// Index in a Lua global state's registry where the global environment is
 /// stored.
-/// 
-/// TODO: Examples?
 pub const REGISTRY_GLOBALS: Integer = 2;
 
 /// Last occupied index in a Lua global state's registry.
@@ -334,38 +366,28 @@ pub struct State {
 /// C functions accept a pointer to a Lua state that they can manipulate.
 /// If a C function pushes some values onto the Lua stack that it wishes to
 /// return, then it must return the number of values it wants to return.
-/// 
-/// TODO: Examples.
 pub type CFunction = unsafe extern "C" fn (l: *mut State) -> c_int;
 
 /// Continuation function.
 /// Also known as `lua_KFunction`.
-/// 
-/// TODO: Documentation of what the parameters and return value mean, examples.
 pub type KFunction = unsafe extern "C" fn (
 	l: *mut State, status: c_int, ctx: KContext
 ) -> c_int;
 
 /// Function that reads blocks when loading Lua chunks.
 /// Also known as `lua_Reader`.
-/// 
-/// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Reader = unsafe extern "C" fn (
 	l: *mut State, ud: *mut c_void, sz: *mut usize
 ) -> *const c_char;
 
 /// Function that writes blocks when dumping Lua chunks.
 /// Also known as `lua_Writer`.
-/// 
-/// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Writer = unsafe extern "C" fn (
 	l: *mut State, p: *const c_void, sz: usize, ud: *mut c_void
 ) -> *const c_char;
 
 /// Memory allocation function.
 /// Also known as `lua_Alloc`.
-/// 
-/// TODO: Explanation of parameters, the return value lifetime, examples.
 pub type Alloc = unsafe extern "C" fn (
 	ud: *mut c_void,
 	ptr: *mut c_void, osize: usize,
@@ -374,8 +396,6 @@ pub type Alloc = unsafe extern "C" fn (
 
 /// Warning handler function.
 /// Also known as `lua_WarnFunction`.
-/// 
-/// TODO: Explanation of parameters and their lifetimes, examples.
 pub type WarnFunction = unsafe extern "C" fn (
 	ud: *mut c_void, msg: *const c_char, tocont: c_int
 );
@@ -707,7 +727,7 @@ extern "C" {
 			self,
 			func_into_index: c_int, n_into: c_int,
 			func_from_index: c_int, n_from: c_int
-		) -> *const c_char;
+		);
 
 		pub fn lua_gethookmask(self) -> c_int;
 		pub fn lua_gethookcount(self) -> c_int;

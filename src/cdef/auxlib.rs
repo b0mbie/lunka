@@ -4,8 +4,15 @@
 
 use super::*;
 use core::ffi::CStr;
-use core::mem::size_of;
-use core::ptr::null;
+use core::marker::PhantomData;
+use core::mem::{
+	MaybeUninit,
+	size_of
+};
+use core::ptr::{
+	null, null_mut
+};
+use core::slice::from_raw_parts_mut;
 
 /// Global table name.
 /// 
@@ -29,10 +36,10 @@ pub const PRELOAD_TABLE: &'static CStr = unsafe {
 };
 
 /// Type for arrays of functions to be registered by [`luaL_setfuncs`].
+/// Also known as `luaL_Reg`.
+/// 
 /// [`Reg::name`] is the function name and [`Reg::func`] is a pointer to the
 /// function.
-/// 
-/// Also known as `luaL_Reg`.
 /// 
 /// Any array of [`Reg`] must end with a sentinel entry in which both `name` and
 /// `func` are null.
@@ -55,6 +62,13 @@ pub const REF_NIL: c_int = -1;
 
 extern "C" {
 	pub fn luaL_newstate() -> *mut State;
+
+	pub fn luaL_prepbuffsize(buffer: *mut Buffer, size: usize) -> *mut c_char;
+	pub fn luaL_addlstring(buffer: *mut Buffer, str: *const c_char, len: usize);
+	pub fn luaL_addstring(buffer: *mut Buffer, str: *const c_char);
+	pub fn luaL_addvalue(buffer: *mut Buffer);
+	pub fn luaL_pushresult(buffer: *mut Buffer);
+	pub fn luaL_pushresultsize(buffer: *mut Buffer, size: usize);
 
 	lua_state_func! {
 		pub fn luaL_checkversion_(self, ver: Number, sz: usize);
@@ -150,6 +164,9 @@ extern "C" {
 			self, module_name: *const c_char,
 			open_fn: CFunction, into_global: c_int
 		);
+
+		pub fn luaL_buffinit(self, buffer: *mut Buffer);
+		pub fn luaL_buffinitsize(self, buffer: *mut Buffer, size: usize);
 	}
 }
 
@@ -244,4 +261,159 @@ pub unsafe fn luaL_pushfail(l: *mut State) {
 	lua_pushnil(l)
 }
 
-// TODO: `luaL_Buffer`?
+/// Initial buffer size used by the buffer system, for [`Buffer`].
+/// Also known as `LUAL_BUFFERSIZE`.
+/// 
+/// This cannot be changed for Lua that's already compiled.
+// TODO: Does it make sense to ever change this?
+pub const BUFFER_SIZE: usize =
+	16 * size_of::<*mut c_void>() * size_of::<Number>();
+
+/// String buffer that allows code to build Lua strings piecemeal.
+/// 
+/// This structure has a lifetime `'l` because it internally stores a pointer to
+/// the Lua [`State`] that was used to initialize this buffer.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
+pub struct Buffer<'l> {
+	buffer_ptr: *mut c_char,
+	capacity: usize,
+	len: usize,
+	l: *mut State,
+	// `buffer` replaces `init` because that structure is not needed here.
+	// Also, I am not entirely sure how this is used.
+	pub buffer: [c_char; BUFFER_SIZE],
+	_life: PhantomData<&'l *mut State>
+}
+
+impl<'l> Buffer<'l> {
+	/// Construct an instance of [`Buffer`] that's zeroed, and put it inside of
+	/// [`MaybeUninit`] for future usage.
+	/// 
+	/// This actually puts the buffer into an invalid state - it must be used
+	/// with [`luaL_buffinit`] to properly initialize it.
+	/// Only then can it be assumed to be initialized.
+	pub const fn zeroed() -> MaybeUninit<Self> {
+		MaybeUninit::new(Self {
+			buffer_ptr: null_mut(),
+			capacity: 0,
+			len: 0,
+			l: null_mut(),
+			buffer: [0; BUFFER_SIZE],
+			_life: PhantomData
+		})
+	}
+
+	/// Construct a properly initialized instance of [`Buffer`] with the
+	/// capacity [`BUFFER_SIZE`] in the raw Lua state pointed to by `l`.
+	/// 
+	/// # Safety
+	/// `l` must point to a valid Lua [`State`].
+	pub unsafe fn new_in_raw(l: *mut State) -> Self {
+		let mut buffer = Self::zeroed();
+		unsafe {
+			luaL_buffinit(l, buffer.as_mut_ptr());
+			buffer.assume_init()
+		}
+	}
+
+	/// Allocate enough space in the buffer for a given number of C characters,
+	/// and use a Rust function to fill the space with characters.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn prep_with(
+		&mut self,
+		size: usize, func: impl FnOnce(&mut [c_char])
+	) {
+		let prep_space = unsafe { luaL_prepbuffsize(self as *mut _, size) };
+		func(unsafe { from_raw_parts_mut(prep_space, size) });
+		self.len += size
+	}
+
+	/// Allocate enough space in the buffer [`BUFFER_SIZE`] C characters, and
+	/// use a Rust function to fill the space with characters.
+	/// 
+	/// See also [`Buffer::prep_with`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn prep_default_with(&mut self, func: impl FnOnce(&mut [c_char])) {
+		self.prep_with(BUFFER_SIZE, func)
+	}
+
+	/// Get the current length of the buffer.
+	/// 
+	/// Equivalent to the C macro `luaL_bufflen`.
+	pub const fn len(&self) -> usize {
+		self.len
+	}
+
+	/// Get the current capacity of the buffer.
+	pub const fn capacity(&self) -> usize {
+		self.capacity
+	}
+
+	/// Return the current contents of the buffer as a Rust mutable slice.
+	/// 
+	/// Functionally equivalent to the C macro `luaL_buffaddr`.
+	pub fn contents(&mut self) -> &mut [c_char] {
+		unsafe { from_raw_parts_mut(self.buffer_ptr, self.capacity) }
+	}
+
+	/// Add 1 C character to the buffer.
+	/// 
+	/// Equivalent to the C macro `luaL_addchar`.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn add_char(&mut self, ch: c_char) {
+		if self.len >= self.capacity {
+			unsafe { luaL_prepbuffsize(self as *mut _, 1) };
+		}
+		self.buffer[self.len] = ch;
+		self.len += 1;
+	}
+
+	/// Remove a given number of C characters from the buffer.
+	/// Equivalent to the C macro `luaL_buffsub`.
+	pub fn remove(&mut self, delta: usize) {
+		self.len -= delta
+	}
+
+	/// Add an array of C characters to the buffer.
+	/// 
+	/// Functionally equivalent to the function [`luaL_addlstring`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn add_chars(&mut self, data: &[c_char]) {
+		unsafe { luaL_addlstring(self as *mut _, data.as_ptr(), data.len()) }
+	}
+
+	/// Add a C string to the buffer.
+	/// Equivalent to the function [`luaL_addstring`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn add_string(&mut self, data: &CStr) {
+		unsafe { luaL_addstring(self as *mut _, data.as_ptr()) }
+	}
+
+	/// Convert a value on top of the associated Lua stack to a string, and pop
+	/// the result into the buffer.
+	/// 
+	/// Equivalent to the function [`luaL_addvalue`].
+	pub fn add_value(&mut self) {
+		unsafe { luaL_addvalue(self as *mut _) }
+	}
+
+	/// Equivalent to the function [`luaL_pushresult`].
+	pub fn finish(mut self) {
+		debug_assert!(
+			self.len <= self.capacity,
+			"buffer length is bigger than its capacity"
+		);
+		unsafe { luaL_pushresult(&mut self as *mut _) }
+	}
+}
