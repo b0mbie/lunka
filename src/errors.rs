@@ -1,6 +1,6 @@
 // This file is just used for documentation.
 
-//! # Lua errors
+//! # Guide for handling Lua errors.
 //! Lua state operations that may involve memory allocation or unprotected
 //! execution of metamethods or other arbitrary code, can raise Lua errors.
 //! 
@@ -15,8 +15,9 @@
 //! For example, raising an error can:
 //! - leak memory.
 //! - put data structures into invalid states.
-//! - unwind the Rust stack safely. This *can* happen if Lua was compiled with
-//! the proper mechanisms in place to safely unwind Rust stacks.
+//! - unwind the Rust stack safely and cause no further issues whatsoever.
+//! This *can* happen if Lua was compiled with the proper mechanisms in place to
+//! safely unwind Rust stacks.
 //! 
 //! Therefore, any function that can raise *any* sort of error is **unsafe**,
 //! because the compiler cannot guarantee that the function was called in an
@@ -26,7 +27,7 @@
 //! 
 //! One exception to this is the function [`lua_error`](crate::cdef::lua_error),
 //! since it is defined to *always* raise an error, therefore the compiler can
-//! always anticipate that.
+//! correctly anticipate that code after a call of this function is unreachable.
 //! 
 //! # Error safety
 //! Rust code can use potentially-error-raising functions safely.

@@ -41,7 +41,7 @@ use crate::cdef::*;
 
 /// Lua garbage collection modes enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Gc {
+pub enum GcMode {
 	Incremental {
 		pause: c_int,
 		step_multiplier: c_int,
@@ -53,7 +53,12 @@ pub enum Gc {
 	}
 }
 
-/// Lua thread wrapper that's used by [`Lua`] and friends.
+/// Lua thread wrapper that's used by [`Lua`] and associated structures.
+/// 
+/// [`Lua`], [`Managed`] and [`Coroutine`] implement [`Deref`] to this type.
+/// 
+/// # Layout
+/// [`Thread`] is guaranteed to have the same layout as a [`*mut State`](State).
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Thread<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
@@ -77,6 +82,8 @@ pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
 	panic!("PANIC: unprotected error in call to Lua API ({msg})")
 }
 
+/// Context for invalidating pointers that may be freed during garbage
+/// collection.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Managed<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {
@@ -323,15 +330,15 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn switch_gc_to(&mut self, gc: Gc) {
+	pub fn switch_gc_to(&mut self, gc: GcMode) {
 		match gc {
-			Gc::Incremental { pause, step_multiplier, step_size } => unsafe {
+			GcMode::Incremental { pause, step_multiplier, step_size } => unsafe {
 				lua_gc(
 					self.l, GcTask::ToIncremental as _,
 					pause, step_multiplier, step_size
 				)
 			},
-			Gc::Generational { minor_mul, major_mul } => unsafe {
+			GcMode::Generational { minor_mul, major_mul } => unsafe {
 				lua_gc(self.l, GcTask::ToGenerational as _, minor_mul, major_mul)
 			}
 		};
@@ -520,9 +527,11 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_pushboolean(self.l, if value { 1 } else { 0 }) }
 	}
 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
 	// NOTE: `n_upvalues` is a C `int`, however Lua uses it as a byte.
 	#[inline(always)]
-	pub fn push_c_closure(&self, func: CFunction, n_upvalues: u8) {
+	pub unsafe fn push_c_closure(&self, func: CFunction, n_upvalues: u8) {
 		unsafe { lua_pushcclosure(self.l, func, n_upvalues as _) }
 	}
 
@@ -546,11 +555,30 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_pushlightuserdata(self.l, ptr) }
 	}
 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub fn push_bytes<'l>(&'l self, data: &[c_char]) -> &'l [c_char] {
+	pub unsafe fn push_chars<'l>(&'l self, data: &[c_char]) -> &'l [c_char] {
 		let length = data.len();
 		unsafe { from_raw_parts(
 			lua_pushlstring(self.l, data.as_ptr(), length),
+			length
+		) }
+	}
+
+	/// Works the same as [`Thread::push_chars`], however it accepts [`u8`]s
+	/// instead of [`c_char`]s.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn push_byte_str<'l>(&'l self, data: &[u8]) -> &'l [u8] {
+		let length = data.len();
+		unsafe { from_raw_parts(
+			lua_pushlstring(
+				self.l,
+				data.as_ptr() as *const _, length
+			) as *const _,
 			length
 		) }
 	}
@@ -560,8 +588,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_pushnil(self.l) }
 	}
 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub fn push_string<'l>(&'l self, data: &CStr) -> &'l CStr {
+	pub unsafe fn push_string<'l>(&'l self, data: &CStr) -> &'l CStr {
 		unsafe { CStr::from_ptr(
 			lua_pushstring(self.l, data.as_ptr())
 		) }
@@ -800,6 +830,39 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_xmove(self.l, to.as_ptr(), n_values as _) }
 	}
 
+	// TODO: Safety.
+	#[inline(always)]
+	pub unsafe fn yield_with(&self, n_results: c_int) -> ! {
+		unsafe { lua_yield(self.l, n_results) }
+	}
+
+	// TODO: Safety.
+	#[inline(always)]
+	pub unsafe fn yield_in_hook_with(&self, n_results: c_int) {
+		unsafe { lua_yield_in_hook(self.l, n_results) };
+	}
+
+	// TODO: Safety.
+	#[inline(always)]
+	pub unsafe fn yield_continue_with(
+		&self, n_results: c_int,
+		continuation: KFunction, context: KContext
+	) -> ! {
+		unsafe { lua_yieldk(self.l, n_results, context, Some(continuation)) }
+	}
+
+	// TODO: Safety.
+	#[inline(always)]
+	pub unsafe fn yield_in_hook_continue_with(
+		&self, n_results: c_int,
+		continuation: KFunction, context: KContext
+	) {
+		unsafe { lua_yieldk_in_hook(
+			self.l, n_results,
+			context, Some(continuation)
+		) };
+	}
+
 	#[inline(always)]
 	pub fn hook(&self) -> Hook<ID_SIZE> {
 		unsafe { lua_gethook(self.l) }
@@ -888,6 +951,11 @@ unsafe impl Allocator for Lua {
 #[cfg(feature = "auxlib")]
 impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	#[inline(always)]
+	pub fn new_buffer<'l>(&'l self) -> auxlib::Buffer<'l> {
+		unsafe { auxlib::Buffer::new_in_raw(self.l) }
+	}
+
+	#[inline(always)]
 	pub fn error_str(&self, message: &CStr) -> ! {
 		unsafe { auxlib::luaL_error(
 			self.l,
@@ -933,8 +1001,20 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 			if into_global { 1 } else { 0 }
 		) }
 	}
+
+	#[inline(always)]
+	pub fn type_name_of<'l>(&'l self, index: c_int) -> &'l CStr {
+		unsafe { CStr::from_ptr(auxlib::luaL_typename(self.l, index)) }
+	}
 }
 
+/// Data structure that represents a main Lua thread.
+/// 
+/// Unlike [`Coroutine`], this data structure has a [`Drop`] implementation that
+/// automatically closes (frees) the Lua state.
+/// 
+/// # Layout
+/// [`Lua`] is guaranteed to have the same layout as [`Thread`].
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Lua<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
@@ -1054,6 +1134,16 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	}
 }
 
+/// Data structure that represents a Lua coroutine.
+/// 
+/// See also [`Lua`] for the main thread.
+/// 
+/// This type does not have a [`Drop`] implementation.
+/// Any threads that are not used anymore must either be closed manually with
+/// [`Coroutine::close`] or left to be garbage-collected by Lua.
+/// 
+/// # Layout
+/// [`Coroutine`] is guaranteed to have the same layout as [`Thread`].
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Coroutine<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {

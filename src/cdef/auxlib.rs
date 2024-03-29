@@ -4,6 +4,7 @@
 
 use super::*;
 use core::ffi::CStr;
+use core::fmt::Write;
 use core::marker::PhantomData;
 use core::mem::{
 	MaybeUninit,
@@ -415,5 +416,19 @@ impl<'l> Buffer<'l> {
 			"buffer length is bigger than its capacity"
 		);
 		unsafe { luaL_pushresult(&mut self as *mut _) }
+	}
+}
+
+impl<'l> Write for Buffer<'l> {
+	fn write_str(&mut self, s: &str) -> core::fmt::Result {
+		unsafe { self.add_chars(core::mem::transmute(s.as_bytes())) };
+		Ok(())
+	}
+
+	fn write_char(&mut self, c: char) -> core::fmt::Result {
+		let mut char_data = [0u8; 4];
+		c.encode_utf8(&mut char_data);
+		unsafe { self.add_chars(core::mem::transmute(&char_data as &[u8])) };
+		Ok(())
 	}
 }
