@@ -171,13 +171,13 @@ extern "C" {
 }
 
 /// Equivalent to the `luaL_checkversion` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_checkversion(l: *mut State) {
 	luaL_checkversion_(l, VERSION_NUM, NUM_SIZES)
 }
 
 /// Equivalent to the `luaL_loadfile` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_loadfile(l: *mut State, file_name: *const c_char) -> c_int {
 	luaL_loadfilex(l, file_name, null())
 }
@@ -185,7 +185,7 @@ pub unsafe fn luaL_loadfile(l: *mut State, file_name: *const c_char) -> c_int {
 /// Functionally equivalent to the `luaL_newlibtable` C macro.
 /// 
 /// `lib` still has to be terminated with a sentinel pair - see [`Reg`].
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_newlibtable(l: *mut State, lib: &[Reg]) {
 	lua_createtable(l, 0, (lib.len() - 1) as _)
 }
@@ -193,7 +193,7 @@ pub unsafe fn luaL_newlibtable(l: *mut State, lib: &[Reg]) {
 /// Functionally equivalent to the `luaL_newlib` C macro.
 /// 
 /// `lib` still has to be terminated with a sentinel pair - see [`Reg`].
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
 	luaL_checkversion(l);
 	luaL_newlibtable(l, lib);
@@ -204,13 +204,13 @@ pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
 // useless. Maybe later.
 
 /// Equivalent to the `luaL_checkstring` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_checkstring(l: *mut State, arg: c_int) -> *const c_char {
 	luaL_checklstring(l, arg, null_mut())
 }
 
 /// Equivalent to the `luaL_optstring` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_optstring(
 	l: *mut State, arg: c_int, default: *const c_char
 ) -> *const c_char {
@@ -218,25 +218,25 @@ pub unsafe fn luaL_optstring(
 }
 
 /// Equivalent to the `luaL_typename` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_typename(l: *mut State, idx: c_int) -> *const c_char {
 	lua_typename(l, lua_type(l, idx))
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_dofile(l: *mut State, file_name: *const c_char) -> bool {
 	luaL_loadfile(l, file_name) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_dostring(l: *mut State, code: *const c_char) -> bool {
 	luaL_loadstring(l, code) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
 }
 
 /// Equivalent to the `luaL_getmetatable` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_getmetatable(l: *mut State, name: *const c_char) -> c_int {
 	lua_getfield(l, REGISTRY_INDEX, name)
 }
@@ -244,7 +244,7 @@ pub unsafe fn luaL_getmetatable(l: *mut State, name: *const c_char) -> c_int {
 // `luaL_opt` omitted here because it can be written out easily.
 
 /// Equivalent to the `luaL_loadbuffer` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_loadbuffer(
 	l: *mut State,
 	buffer: *const c_char, buffer_sz: usize,
@@ -256,7 +256,7 @@ pub unsafe fn luaL_loadbuffer(
 // `luaL_intop` omitted here because it can be written out easily.
 
 /// Equivalent to the `luaL_pushfail` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn luaL_pushfail(l: *mut State) {
 	lua_pushnil(l)
 }

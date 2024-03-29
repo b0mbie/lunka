@@ -776,7 +776,7 @@ macro_rules! genericize_fn {
 	) => {
 		/// Equivalent to the API function of the same name, but it can accept
 		/// generic parameters.
-		#[inline]
+		#[inline(always)]
 		$vis unsafe fn $name<$($gen)+>(
 			$($param_n : $param_ty),*
 		) $( -> $ret )? {
@@ -834,13 +834,13 @@ genericize_fn!(
 );
 
 /// Equivalent to the `lua_call` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_call(l: *mut State, n_args: c_int, n_results: c_int) {
 	lua_callk(l, n_args, n_results, 0, None)
 }
 
 /// Equivalent to the `lua_pcall` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_pcall(
 	l: *mut State,
 	n_args: c_int, n_results: c_int,
@@ -851,14 +851,14 @@ pub unsafe fn lua_pcall(
 
 /// *Almost* equivalent to the `lua_yield` C macro, however this function
 /// specifically uses [`lua_yieldk`].
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_yield(l: *mut State, n_results: c_int) -> ! {
 	lua_yieldk(l, n_results, 0, None)
 }
 
 /// *Almost* equivalent to the `lua_yield` C macro, however this function
 /// specifically uses [`lua_yieldk_in_hook`].
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_yield_in_hook(l: *mut State, n_results: c_int) -> c_int {
 	lua_yieldk_in_hook(l, n_results, 0, None)
 }
@@ -877,37 +877,37 @@ pub const unsafe fn get_extra_space(
 }
 
 /// Equivalent to the `lua_tonumber` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_tonumber(l: *mut State, idx: c_int) -> Number {
 	lua_tonumberx(l, idx, null_mut())
 }
 
 /// Equivalent to the `lua_tointeger` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_tointeger(l: *mut State, idx: c_int) -> Integer {
 	lua_tointegerx(l, idx, null_mut())
 }
 
 /// Equivalent to the `lua_pop` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_pop(l: *mut State, n: c_int) {
 	lua_settop(l, -n - 1)
 }
 
 /// Equivalent to the `lua_newtable` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_newtable(l: *mut State) {
 	lua_createtable(l, 0, 0)
 }
 
 /// Equivalent to the `lua_pushcfunction` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_pushcfunction(l: *mut State, func: CFunction) {
 	lua_pushcclosure(l, func, 0)
 }
 
 /// Equivalent to the `lua_register` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_register(l: *mut State, name: *const c_char, func: CFunction) {
 	lua_pushcfunction(l, func);
 	lua_setglobal(l, name);
@@ -921,7 +921,7 @@ macro_rules! lua_is {
 	) => {
 		$(
 			/// Equivalent to the C macro of the same name.
-			#[inline]
+			#[inline(always)]
 			$vis unsafe fn $name(l: *mut State, idx: c_int) -> bool {
 				lua_type(l, idx) == ($type as _)
 			}
@@ -940,7 +940,7 @@ lua_is! {
 }
 
 /// Equivalent to the `lua_isnoneornil` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_isnoneornil(l: *mut State, idx: c_int) -> bool {
 	lua_type(l, idx) <= 0
 }
@@ -950,32 +950,32 @@ pub unsafe fn lua_isnoneornil(l: *mut State, idx: c_int) -> bool {
 // If only...
 
 /// Equivalent to the `lua_pushglobaltable` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_pushglobaltable(l: *mut State) {
 	lua_rawgeti(l, REGISTRY_INDEX, REGISTRY_GLOBALS);
 }
 
 /// Equivalent to the `lua_tostring` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_tostring(l: *mut State, idx: c_int) -> *const c_char {
 	lua_tolstring(l, idx, null_mut())
 }
 
 /// Equivalent to the `lua_insert` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_insert(l: *mut State, idx: c_int) {
 	lua_rotate(l, idx, 1)
 }
 
 /// Equivalent to the `lua_remove` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_remove(l: *mut State, idx: c_int) {
 	lua_rotate(l, idx, -1);
 	lua_pop(l, 1);
 }
 
 /// Equivalent to the `lua_replace` C macro.
-#[inline]
+#[inline(always)]
 pub unsafe fn lua_replace(l: *mut State, idx: c_int) {
 	lua_copy(l, -1, idx);
 	lua_pop(l, 1);
