@@ -335,7 +335,7 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		}
 	}
 
-	/// Works the same as [`Managed::aux_to_chars`], however it returns an array
+	/// Works the same as [`Managed::to_chars_aux`], however it returns an array
 	/// of [`u8`]s instead of [`c_char`]s.
 	/// 
 	/// # Safety
