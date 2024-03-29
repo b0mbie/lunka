@@ -204,13 +204,13 @@ macro_rules! c_int_enum {
 pub(crate) use c_int_enum;
 
 c_int_enum! {
-	/// Lua thread status.
+	/// Lua status code enumeration.
 	/// 
 	/// This status usually indicates a success or some sort of failure in the
 	/// form of a caught raised error.
 	/// Read more about errors in the [documentation](crate::errors).
 	#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-	pub enum ThreadStatus {
+	pub enum Status {
 		/// No errors.
 		/// Also known as `LUA_OK`.
 		Ok = 0,
@@ -240,15 +240,15 @@ c_int_enum! {
 	}
 }
 
-impl ThreadStatus {
+impl Status {
 	/// Return true if the status represents no error.
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::cdef::ThreadStatus;
-	/// assert!(ThreadStatus::Ok.is_ok());
-	/// assert!(ThreadStatus::Yielded.is_ok());
-	/// assert!(!ThreadStatus::MemoryError.is_ok());
+	/// use lunka::cdef::Status;
+	/// assert!(Status::Ok.is_ok());
+	/// assert!(Status::Yielded.is_ok());
+	/// assert!(!Status::MemoryError.is_ok());
 	/// ```
 	pub const fn is_ok(self) -> bool {
 		match self {
@@ -262,9 +262,9 @@ impl ThreadStatus {
 	/// 
 	/// # Examples
 	/// ```
-	/// use lunka::cdef::ThreadStatus;
-	/// assert!(ThreadStatus::Yielded.is_yield());
-	/// assert!(!ThreadStatus::Ok.is_yield());
+	/// use lunka::cdef::Status;
+	/// assert!(Status::Yielded.is_yield());
+	/// assert!(!Status::Ok.is_yield());
 	/// ```
 	pub const fn is_yield(self) -> bool {
 		match self {

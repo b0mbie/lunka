@@ -48,7 +48,7 @@ pub const PRELOAD_TABLE: &'static CStr = unsafe {
 #[repr(C)]
 pub struct Reg {
 	pub name: *const c_char,
-	pub func: CFunction
+	pub func: Option<CFunction>
 }
 
 /// Packed combination [`Integer`] and [`Number`] type sizes for

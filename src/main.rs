@@ -39,7 +39,7 @@ unsafe extern "C" fn l_rs_print(l: *mut cdef::State) -> core::ffi::c_int {
 }
 
 #[must_use]
-fn report(lua: &mut Lua, status: ThreadStatus) -> bool {
+fn report(lua: &mut Lua, status: Status) -> bool {
 	if !status.is_ok() {
 		if let Some(message) = unsafe { lua.to_string(-1) } {
 			lua.pop(1);
@@ -71,7 +71,7 @@ fn main() {
 		l_rs_print
 	) };
 
-	let status = lua.load_file(TEST_FILE);
+	let status = unsafe { lua.load_file(TEST_FILE) };
 	if !report(&mut lua, status) { return }
 
 	unsafe { lua.push_byte_str(b"Mega Serval") };

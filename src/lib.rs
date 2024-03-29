@@ -3,6 +3,11 @@
 
 #![no_std]
 
+// Important notes:
+// - Upvalues are presented as `int`s, however Lua uses them in `lu_byte`s.
+// - Uservalue indices are presented as `int`s, however Lua uses them in
+// `unsigned short`s.
+
 use allocator_api2::alloc::{
 	AllocError, Allocator, Global
 };
@@ -28,16 +33,30 @@ use core::slice::{
 #[cfg(doc)]
 pub mod errors;
 
+#[cfg(feature = "auxlib")]
+pub mod aux_options;
 pub mod cdef;
 pub use cdef::{
 	Number,
 	Integer,
-	ThreadStatus,
+	Status,
 	Type,
 	upvalue_index
 };
+#[cfg(feature = "auxlib")]
+pub mod reg;
 
 use crate::cdef::*;
+
+#[cfg(feature = "auxlib")]
+use auxlib::*;
+
+#[cfg(feature = "auxlib")]
+pub use {
+	auxlib::Reg,
+	aux_options::*,
+	reg::*
+};
 
 /// Lua garbage collection modes enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -131,7 +150,7 @@ impl<'l, const ID_SIZE: usize> DerefMut for Managed<'l, ID_SIZE> {
 	}
 }
 
-impl<'l> Managed<'l> {
+impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 	#[inline(always)]
 	pub fn restart_gc(&mut self) {
 		unsafe { lua_gc(self.l, GcTask::Restart as _) };
@@ -152,8 +171,8 @@ impl<'l> Managed<'l> {
 		&mut self,
 		n_args: c_uint, n_results: c_uint,
 		err_func: c_int
-	) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(
+	) -> Status {
+		unsafe { Status::from_c_int_unchecked(
 			lua_pcall(self.l, n_args as _, n_results as _, err_func)
 		) }
 	}
@@ -206,14 +225,6 @@ impl<'l> Managed<'l> {
 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	#[cfg(feature = "stdlibs")]
-	#[inline(always)]
-	pub unsafe fn open_libs(&mut self) {
-		unsafe { stdlibs::luaL_openlibs(self.l) }
-	}
-
-	/// # Safety
-	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
 	pub unsafe fn set_field(&self, obj_index: c_int, key: &CStr) {
 		unsafe { lua_setfield(self.l, obj_index, key.as_ptr()) }
@@ -224,6 +235,86 @@ impl<'l> Managed<'l> {
 	#[inline(always)]
 	pub unsafe fn set_i(&self, obj_index: c_int, i: Integer) {
 		unsafe { lua_seti(self.l, obj_index, i) }
+	}
+}
+
+#[cfg(feature = "stdlibs")]
+impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn open_libs(&mut self) {
+		unsafe { stdlibs::luaL_openlibs(self.l) }
+	}
+}
+
+#[cfg(feature = "auxlib")]
+impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn call_metamethod(
+		&mut self,
+		obj_index: c_int, event: &CStr
+	) -> bool {
+		(unsafe { luaL_callmeta(
+			self.l,
+			obj_index, event.as_ptr()
+		) }) != 0
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn do_file(&mut self, file_name: &CStr) -> bool {
+		unsafe { luaL_dofile(self.l, file_name.as_ptr()) }
+	}
+
+	#[inline(always)]
+	pub fn do_string(&mut self, code: &CStr) -> bool {
+		unsafe { luaL_dostring(self.l, code.as_ptr()) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn get_sub_table(
+		&mut self,
+		parent_index: c_int, table_name: &CStr
+	) -> bool {
+		(unsafe { luaL_getsubtable(
+			self.l,
+			parent_index, table_name.as_ptr()
+		) }) != 0
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn to_chars_aux(&'l mut self, index: c_int) -> Option<&'l [c_char]> {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
+		if !str_ptr.is_null() {
+			Some(unsafe { from_raw_parts(str_ptr, len) })
+		} else {
+			None
+		}
+	}
+
+	/// Works the same as [`Managed::aux_to_chars`], however it returns an array
+	/// of [`u8`]s instead of [`c_char`]s.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn to_byte_str_aux(&'l mut self, index: c_int) -> Option<&'l [u8]> {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
+		if !str_ptr.is_null() {
+			Some(unsafe { from_raw_parts(str_ptr as *const _, len) })
+		} else {
+			None
+		}
 	}
 }
 
@@ -318,8 +409,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn close_as_coroutine(&mut self) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(lua_resetthread(self.l)) }
+	pub fn close_as_coroutine(&mut self) -> Status {
+		unsafe { Status::from_c_int_unchecked(lua_resetthread(self.l)) }
 	}
 
 	#[inline(always)]
@@ -377,7 +468,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn check_stack(&self, n: c_uint) -> bool {
+	pub fn test_stack(&self, n: c_uint) -> bool {
 		(unsafe { lua_checkstack(self.l, n as _) }) != 0
 	}
 
@@ -409,7 +500,6 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { Type::from_c_int_unchecked(lua_getglobal(self.l, name.as_ptr())) }
 	}
 
-	// NOTE: In C `n` is `int`, however Lua uses it as an `unsigned short`.
 	#[inline(always)]
 	pub fn get_i_uservalue(&self, ud_index: c_int, n: c_ushort) -> Type {
 		unsafe { Type::from_c_int_unchecked(
@@ -478,8 +568,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		&self,
 		reader: Reader, data: *mut c_void,
 		chunk_name: &CStr, mode: &CStr
-	) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(
+	) -> Status {
+		unsafe { Status::from_c_int_unchecked(
 			lua_load(self.l, reader, data, chunk_name.as_ptr(), mode.as_ptr())
 		) }
 	}
@@ -503,8 +593,6 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	// NOTE: In C `n_uservalues` is `int`, however Lua uses it as an
-	// `unsigned short`.
 	#[inline(always)]
 	pub unsafe fn new_userdata_uv<'l>(
 		&'l self,
@@ -523,8 +611,6 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	// NOTE: In C `n_uservalues` is `int`, however Lua uses it as an
-	// `unsigned short`.
 	#[inline(always)]
 	pub unsafe fn new_copy_t<'l, T: Copy>(
 		&'l self, value: T, n_uservalues: c_ushort
@@ -556,7 +642,6 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	// NOTE: `n_upvalues` is a C `int`, however Lua uses it as a byte.
 	#[inline(always)]
 	pub unsafe fn push_c_closure(&self, func: CFunction, n_upvalues: u8) {
 		unsafe { lua_pushcclosure(self.l, func, n_upvalues as _) }
@@ -702,14 +787,14 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	pub fn resume(
 		&self, from: &Thread,
 		n_args: c_int
-	) -> (ThreadStatus, c_int) {
+	) -> (Status, c_int) {
 		let mut n_res = 0;
 		let status = unsafe { lua_resume(
 			self.l, from.as_ptr(),
 			n_args,
 			&mut n_res as *mut _
 		) };
-		(unsafe { ThreadStatus::from_c_int_unchecked(status) }, n_res)
+		(unsafe { Status::from_c_int_unchecked(status) }, n_res)
 	}
 
 	#[inline(always)]
@@ -724,7 +809,6 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_setglobal(self.l, key.as_ptr()) }
 	}
 
-	// NOTE: In C `n` is `int`, however Lua uses it as an `unsigned short`.
 	#[inline(always)]
 	pub fn set_i_uservalue(&self, ud_index: c_int, n: c_ushort) -> bool {
 		(unsafe { lua_setiuservalue(self.l, ud_index, n as _) }) != 0
@@ -742,8 +826,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn status(&self) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(lua_status(self.l)) }
+	pub fn status(&self) -> Status {
+		unsafe { Status::from_c_int_unchecked(lua_status(self.l)) }
 	}
 
 	#[inline(always)]
@@ -778,6 +862,24 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		let str_ptr = unsafe { lua_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
 			Some(unsafe { from_raw_parts(str_ptr, len) })
+		} else {
+			None
+		}
+	}
+
+	/// Works the same as [`Thread::to_chars`], however it returns an array of
+	/// [`u8`]s instead of [`c_char`]s.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn to_byte_str<'l>(
+		&'l self, index: c_int
+	) -> Option<&'l [u8]> {
+		let mut len = 0;
+		let str_ptr = unsafe { lua_tolstring(self.l, index, &mut len as *mut _) };
+		if !str_ptr.is_null() {
+			Some(unsafe { from_raw_parts(str_ptr as *const _, len) })
 		} else {
 			None
 		}
@@ -919,8 +1021,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn get_upvalue<'l>(&'l self, func_index: c_int, n: c_int) -> &'l CStr {
-		unsafe { CStr::from_ptr(lua_getupvalue(self.l, func_index, n)) }
+	pub fn get_upvalue<'l>(&'l self, func_index: c_int, n: u8) -> &'l CStr {
+		unsafe { CStr::from_ptr(lua_getupvalue(self.l, func_index, n as _)) }
 	}
 
 	#[inline(always)]
@@ -937,25 +1039,25 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	#[inline(always)]
-	pub fn set_upvalue<'l>(&'l self, func_index: c_int, n: c_int) -> &'l CStr {
-		unsafe { CStr::from_ptr(lua_setupvalue(self.l, func_index, n)) }
+	pub fn set_upvalue<'l>(&'l self, func_index: c_int, n: u8) -> &'l CStr {
+		unsafe { CStr::from_ptr(lua_setupvalue(self.l, func_index, n as _)) }
 	}
 
 	#[inline(always)]
-	pub fn upvalue_id(&self, func_index: c_int, n: c_int) -> *mut c_void {
-		unsafe { lua_upvalueid(self.l, func_index, n) }
+	pub fn upvalue_id(&self, func_index: c_int, n: u8) -> *mut c_void {
+		unsafe { lua_upvalueid(self.l, func_index, n as _) }
 	}
 
 	#[inline(always)]
 	pub fn upvalue_join(
 		&self,
-		func_into_index: i32, n_into: i32,
-		func_from_index: i32, n_from: i32
+		func_into_index: i32, n_into: u8,
+		func_from_index: i32, n_from: u8
 	) {
 		unsafe { lua_upvaluejoin(
 			self.l,
-			func_into_index, n_into,
-			func_from_index, n_from
+			func_into_index, n_into as _,
+			func_from_index, n_from as _
 		) }
 	}
 }
@@ -978,42 +1080,277 @@ unsafe impl Allocator for Lua {
 #[cfg(feature = "auxlib")]
 impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	#[inline(always)]
-	pub fn new_buffer<'l>(&'l self) -> auxlib::Buffer<'l> {
-		unsafe { auxlib::Buffer::new_in_raw(self.l) }
+	pub fn new_buffer<'l>(&'l self) -> Buffer<'l> {
+		unsafe { Buffer::new_in_raw(self.l) }
+	}
+
+	#[inline(always)]
+	pub fn arg_error(&self, arg: c_int, extra_message: &CStr) -> ! {
+		unsafe { luaL_argerror(self.l, arg, extra_message.as_ptr()) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg`'s type is incorrect.
+	#[inline(always)]
+	pub unsafe fn check_any(&self, arg: c_int) {
+		unsafe { luaL_checkany(self.l, arg) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg`'s type is incorrect.
+	#[inline(always)]
+	pub unsafe fn check_integer(&self, arg: c_int) -> Integer {
+		unsafe { luaL_checkinteger(self.l, arg) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string.
+	#[inline(always)]
+	pub unsafe fn check_chars<'l>(&'l self, arg: c_int) -> &'l [c_char] {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_checklstring(self.l, arg, &mut len as *mut _) };
+		unsafe { from_raw_parts(str_ptr, len) }
+	}
+
+	/// Works the same as [`Thread::check_chars`], however it returns an array
+	/// of [`u8`]s instead of [`c_char`]s.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string.
+	#[inline(always)]
+	pub unsafe fn check_byte_str<'l>(&'l self, arg: c_int) -> &'l [u8] {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_checklstring(self.l, arg, &mut len as *mut _) };
+		unsafe { from_raw_parts(str_ptr as *const _, len) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg`'s type is incorrect.
+	#[inline(always)]
+	pub unsafe fn check_number(&self, arg: c_int) -> Number {
+		unsafe { luaL_checknumber(self.l, arg) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` is not a string or if the string cannot be found in `list`. 
+	#[inline(always)]
+	pub unsafe fn check_option<const N: usize>(
+		&self, arg: c_int,
+		default: Option<&CStr>,
+		list: AuxOptions<'_, N>
+	) -> usize {
+		(unsafe { luaL_checkoption(
+			self.l, arg,
+			default.map(|cstr| cstr.as_ptr()).unwrap_or(null()),
+			list.as_ptr()
+		) }) as _
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// Lua stack cannot grow to the given size.
+	#[inline(always)]
+	pub unsafe fn check_stack(&self, size: c_int, message: &CStr) {
+		unsafe { luaL_checkstack(self.l, size, message.as_ptr()) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string.
+	#[inline(always)]
+	pub unsafe fn check_string<'l>(&'l self, arg: c_int) -> &'l CStr {
+		let str_ptr = unsafe { luaL_checkstring(self.l, arg) };
+		unsafe { CStr::from_ptr(str_ptr) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg`'s type is incorrect.
+	#[inline(always)]
+	pub unsafe fn check_type(&self, arg: c_int, type_tag: Type) {
+		unsafe { luaL_checktype(self.l, arg, type_tag as _) }
+	}
+
+	// TODO: `luaL_checkudata`.
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the code
+	/// making the call and the Lua library being called are using different
+	/// version of Lua, or if the numeric types differ.
+	#[inline(always)]
+	pub unsafe fn check_version(&self) {
+		unsafe { luaL_checkversion(self.l) }
 	}
 
 	#[inline(always)]
 	pub fn error_str(&self, message: &CStr) -> ! {
-		unsafe { auxlib::luaL_error(
+		unsafe { luaL_error(
 			self.l,
 			CStr::from_bytes_with_nul_unchecked(b"%s\0").as_ptr(),
 			message.as_ptr()
 		) }
 	}
 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub fn load_file(&self, code: &CStr) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(
-			auxlib::luaL_loadfile(self.l, code.as_ptr())
-		) }
+	pub unsafe fn exec_result(&self, status: c_int) -> c_int {
+		unsafe { luaL_execresult(self.l, status) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn file_result(&self, status: c_int, file_name: &CStr) -> c_int {
+		unsafe { luaL_fileresult(self.l, status, file_name.as_ptr()) }
+	}
+	
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn get_meta_field(&self, obj_index: c_int, event: &CStr) -> Type {
+		unsafe { Type::from_c_int_unchecked(luaL_getmetafield(
+			self.l, obj_index, event.as_ptr()
+		)) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn get_aux_metatable(&self, type_name: &CStr) -> Type {
+		unsafe { Type::from_c_int_unchecked(luaL_getmetatable(
+			self.l, type_name.as_ptr()
+		)) }
 	}
 
 	#[inline(always)]
-	pub fn load_stdin(&self) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(
-			auxlib::luaL_loadfile(self.l, null())
+	pub fn load_chars(&self, buffer: &[c_char], name: &CStr) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			luaL_loadbuffer(
+				self.l,
+				buffer.as_ptr(), buffer.len(),
+				name.as_ptr()
+			)
 		) }
 	}
 
+	/// Works the same as [`Thread::load_chars`], however it accepts an array of
+	/// [`u8`]s instead of [`c_char`]s.
 	#[inline(always)]
-	pub fn load_string(&self, code: &CStr) -> ThreadStatus {
-		unsafe { ThreadStatus::from_c_int_unchecked(
-			auxlib::luaL_loadstring(self.l, code.as_ptr())
+	pub fn load_byte_str(&self, buffer: &[u8], name: &CStr) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			luaL_loadbuffer(
+				self.l,
+				buffer.as_ptr() as *const _, buffer.len(),
+				name.as_ptr()
+			)
 		) }
 	}
 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn load_file(&self, code: &CStr) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			luaL_loadfile(self.l, code.as_ptr())
+		) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn load_stdin(&self) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			luaL_loadfile(self.l, null())
+		) }
+	}
+
+	#[inline(always)]
+	pub fn load_string(&self, code: &CStr) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			luaL_loadstring(self.l, code.as_ptr())
+		) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn new_lib<const N: usize>(&self, library: &Library<'_, N>) {
+		unsafe { luaL_newlib(self.l, library.as_reg_slice()) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a mumber, isn't a `nil` and not absent.
+	pub unsafe fn opt_integer(&self, arg: c_int, default: Integer) -> Integer {
+		unsafe { luaL_optinteger(self.l, arg, default) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string, isn't a `nil` and not absent.
+	pub unsafe fn opt_chars<'l>(
+		&'l self, arg: c_int, default: &'l CStr
+	) -> &'l [c_char] {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_optlstring(
+			self.l, arg, default.as_ptr(),
+			&mut len as *mut _
+		) };
+		unsafe { from_raw_parts(str_ptr, len) }
+	}
+
+	/// Works the same as [`Thread::opt_chars`], however it returns an array of
+	/// [`u8`]s instead of [`c_char`]s.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string, isn't a `nil` and not absent.
+	pub unsafe fn opt_byte_str<'l>(
+		&'l self, arg: c_int, default: &'l [u8]
+	) -> &'l [u8] {
+		let mut len = 0;
+		let str_ptr = unsafe { luaL_optlstring(
+			self.l, arg, default.as_ptr() as *const _,
+			&mut len as *mut _
+		) };
+		unsafe { from_raw_parts(str_ptr as *const _, len) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a mumber, isn't a `nil` and not absent.
+	pub unsafe fn opt_number(&self, arg: c_int, default: Number) -> Number {
+		unsafe { luaL_optnumber(self.l, arg, default) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// argument `arg` isn't a string, isn't a `nil` and not absent.
+	pub unsafe fn opt_string<'l>(
+		&'l self, arg: c_int, default: &'l CStr
+	) -> &'l CStr {
+		unsafe { CStr::from_ptr(luaL_optstring(self.l, arg, default.as_ptr())) }
+	}
+
+	#[inline(always)]
+	pub fn push_fail(&self) {
+		unsafe { luaL_pushfail(self.l) }
+	}
+
+	#[inline(always)]
+	pub unsafe fn create_ref(&self, store_index: c_int) -> c_int {
+		unsafe { luaL_ref(self.l, store_index) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
 	pub unsafe fn require(
 		&self,
@@ -1021,7 +1358,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		open_fn: CFunction,
 		into_global: bool
 	) {
-		unsafe { auxlib::luaL_requiref(
+		unsafe { luaL_requiref(
 			self.l,
 			module_name.as_ptr(),
 			open_fn,
@@ -1029,9 +1366,59 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		) }
 	}
 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn set_funcs<const N: usize>(
+		&self, library: &Library<'_, N>, n_upvalues: u8
+	) {
+		unsafe { luaL_setfuncs(self.l, library.as_ptr(), n_upvalues as _) }
+	}
+
+	#[inline(always)]
+	pub fn set_aux_metatable(&self, type_name: &CStr) {
+		unsafe { luaL_setmetatable(self.l, type_name.as_ptr()) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn test_udata(
+		&self, arg: c_int, type_name: &CStr
+	) -> Option<NonNull<u8>> {
+		NonNull::new(unsafe {
+			luaL_testudata(self.l, arg, type_name.as_ptr())  as *mut u8
+		})
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn traceback(&self, of: &Thread, message: &CStr, level: c_int) {
+		unsafe { luaL_traceback(self.l, of.as_ptr(), message.as_ptr(), level) }
+	}
+
+	// TODO: Is `type_name` safe here?
+	#[inline(always)]
+	pub fn type_error(&self, arg: c_int, type_name: &CStr) -> ! {
+		unsafe { luaL_typeerror(self.l, arg, type_name.as_ptr()) }
+	}
+
 	#[inline(always)]
 	pub fn type_name_of<'l>(&'l self, index: c_int) -> &'l CStr {
-		unsafe { CStr::from_ptr(auxlib::luaL_typename(self.l, index)) }
+		unsafe { CStr::from_ptr(luaL_typename(self.l, index)) }
+	}
+
+	#[inline(always)]
+	pub fn destroy_ref(&self, store_index: c_int, ref_idx: c_int) {
+		unsafe { luaL_unref(self.l, store_index, ref_idx) }
+	}
+
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn where_str(&self, level: c_int) {
+		unsafe { luaL_where(self.l, level) }
 	}
 }
 
@@ -1089,7 +1476,7 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	#[cfg(feature = "auxlib")]
 	#[inline(always)]
 	pub fn new_auxlib() -> Option<Self> {
-		unsafe { Self::from_l(auxlib::luaL_newstate()) }
+		unsafe { Self::from_l(luaL_newstate()) }
 	}
 
 	#[inline(always)]
@@ -1179,7 +1566,7 @@ pub struct Coroutine<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {
 }
 
 impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
-	pub fn close(&mut self) -> ThreadStatus {
+	pub fn close(&mut self) -> Status {
 		self.thread.close_as_coroutine()
 	}
 }
