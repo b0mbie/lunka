@@ -35,13 +35,18 @@ fn c_eprintln(data: &CStr) {
 
 unsafe extern "C" fn l_rs_print(l: *mut cdef::State) -> core::ffi::c_int {
 	let lua: Thread = Thread::from_ptr(l);
-	
 	for index in 1..=lua.top() {
 		if let Some(data) = lua.to_string(index) {
 			c_println(data);
 		}
 	}
 	0
+}
+
+unsafe extern "C" fn l_rs_raise(l: *mut cdef::State) -> core::ffi::c_int {
+	let lua: Thread = Thread::from_ptr(l);
+	let message = lua.check_string(1);
+	lua_fmt_error!(&lua, "`rs.raise`: %s", message.as_ptr())
 }
 
 #[must_use]
@@ -63,8 +68,9 @@ fn report(lua: &mut Thread, status: Status) -> bool {
 	}
 }
 
-pub const RS_LIB: Library<'static, 1> = Library::new(unsafe {[
-	(cstr!("print"), l_rs_print)
+pub const RS_LIB: Library<'static, 2> = Library::new(unsafe {[
+	(cstr!("print"), l_rs_print),
+	(cstr!("raise"), l_rs_raise)
 ]});
 
 unsafe extern "C" fn l_msgh(l: *mut cdef::State) -> core::ffi::c_int {
@@ -83,7 +89,7 @@ unsafe extern "C" fn l_msgh(l: *mut cdef::State) -> core::ffi::c_int {
 		return 1
 	}
 
-	push_fmt_string!(lua, "(error object is a %s value)", lua.type_name_of(1));
+	lua_push_fmt_string!(lua, "(error object is a %s value)", lua.type_name_of(1));
 
 	1
 }

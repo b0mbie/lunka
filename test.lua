@@ -4,4 +4,4 @@
 print("I'm difficult-icult", ...)
 rs.print("Hello, Rust!", ...)
 
-error("bee") -- bug
+rs.raise("bee") -- bug
