@@ -57,6 +57,33 @@ pub enum GcMode {
 /// 
 /// [`Lua`], [`Managed`] and [`Coroutine`] implement [`Deref`] to this type.
 /// 
+/// # Borrowing
+/// Most methods borrow instances of this type immutably, even though, at least
+/// *in theory*, they should've borrowed mutably.
+/// For instance, [`Thread::push_nil`], even though it modifies the Lua stack by
+/// pushing a `nil`, still borrows a [`Thread`] immutably.
+/// 
+/// In the case for this structure, borrowing immutably means **not in any way
+/// being able to trigger the GC to collect garbage**.
+/// Any references returned by methods for this structure are simply the same
+/// pointers that the C API returns, though they are converted to references for
+/// the Rust borrow checker to ensure safety.
+/// The Lua garbage collector will not invalidate any pointers if it is stopped.
+/// [`Lua`] will usually force the garbage collector to stay off with an API
+/// call if the code has declared that some pointers must not be invalidated.
+/// 
+/// To call API functions that can potentially enable the GC, it is required
+/// that any references that have been acquired previously from a [`Thread`] are
+/// immediately invalidated, so they cannot be used *if* the garbage collector
+/// decides to collect them.
+/// This is done by borrowing [`Thread`] mutably once, through
+/// [`Thread::run_managed`], which allows for more operations.
+/// 
+/// The main reason for this model existing is because it may be difficult to
+/// formally prove that a reference would not be collected without using stack
+/// indices. This model simply utilizes checks done at compile time to ensure
+/// safety.
+/// 
 /// # Layout
 /// [`Thread`] is guaranteed to have the same layout as a [`*mut State`](State).
 #[derive(Debug)]
