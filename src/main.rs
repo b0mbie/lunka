@@ -48,7 +48,6 @@ unsafe extern "C" fn l_rs_print(l: *mut cdef::State) -> core::ffi::c_int {
 fn report(lua: &mut Thread, status: Status) -> bool {
 	if !status.is_ok() {
 		if let Some(message) = unsafe { lua.to_string(-1) } {
-			lua.pop(1);
 			c_eprintln(message);
 		} else {
 			let mut buf = lua.new_buffer();
@@ -72,7 +71,7 @@ unsafe extern "C" fn l_msgh(l: *mut cdef::State) -> core::ffi::c_int {
 	let mut lua: Thread = Thread::from_ptr(l);
 	
 	if let Some(msg) = lua.to_string(1) {
-		lua.traceback(&lua, msg, 1);
+		lua.traceback(&lua, Some(msg), 1);
 		return 1
 	}
 

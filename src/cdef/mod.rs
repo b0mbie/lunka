@@ -18,14 +18,19 @@
 //! - do not use locks even with RAII guards, because they suffer from the same
 //! problem as non-Lua allocations.
 
-use core::ffi::c_char;
-use core::ffi::c_int;
-use core::ffi::c_uchar;
-use core::ffi::c_uint;
-use core::ffi::c_ushort;
-use core::ffi::c_void;
+use core::ffi::{
+	c_char,
+	c_int,
+	c_uchar,
+	c_uint,
+	c_ushort,
+	c_void
+};
 use core::mem::transmute;
-use core::ptr::null_mut;
+use core::ptr::{
+	null_mut,
+	null
+};
 
 #[cfg(feature = "auxlib")]
 pub mod auxlib;
@@ -434,9 +439,36 @@ pub struct Debug<const ID_SIZE: usize> {
 	pub n_transferred: c_ushort,
 	pub short_src: [c_char; ID_SIZE],
 
-	// Private part...
+	// ... private part...
+	_no_construct: (),
+
 	// Not entirely sure why this is public, but maybe someone might need it.
 	pub active_function: *const c_void
+}
+
+impl<const ID_SIZE: usize> Debug<ID_SIZE> {
+	pub const fn zeroed() -> Self {
+		Self {
+			event: 0,
+			name: null(),
+			name_what: null(),
+			what: null(),
+			source: null(), source_len: 0,
+			current_line: -1,
+			line_defined: -1, last_line_defined: -1,
+			n_upvalues: 0,
+			n_params: 0,
+			is_vararg: 0,
+			is_tail_call: 0,
+			first_transferred: 0,
+			n_transferred: 0,
+			short_src: [0; ID_SIZE],
+
+			_no_construct: (),
+
+			active_function: null()
+		}
+	}
 }
 
 /// Function to be called by the Lua debugger in specific events.
