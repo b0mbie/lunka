@@ -11,9 +11,15 @@ use std::io::{
 	Write as IoWrite
 };
 
-const TEST_FILE: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(
-	b"test.lua\0"
-) };
+macro_rules! cstr {
+	($text:literal) => {
+		CStr::from_bytes_with_nul_unchecked(
+			concat!($text, "\0").as_bytes()
+		)
+	};
+}
+
+const TEST_FILE: &CStr = unsafe { cstr!("test.lua") };
 
 fn c_println(data: &CStr) {
 	let mut out = stdout();
@@ -39,7 +45,7 @@ unsafe extern "C" fn l_rs_print(l: *mut cdef::State) -> core::ffi::c_int {
 }
 
 #[must_use]
-fn report(lua: &mut Lua, status: Status) -> bool {
+fn report(lua: &mut Thread, status: Status) -> bool {
 	if !status.is_ok() {
 		if let Some(message) = unsafe { lua.to_string(-1) } {
 			lua.pop(1);
@@ -58,28 +64,69 @@ fn report(lua: &mut Lua, status: Status) -> bool {
 	}
 }
 
+pub const RS_LIB: Library<'static, 1> = Library::new(unsafe {[
+	(cstr!("print"), l_rs_print)
+]});
+
+unsafe extern "C" fn l_msgh(l: *mut cdef::State) -> core::ffi::c_int {
+	let mut lua: Thread = Thread::from_ptr(l);
+	
+	if let Some(msg) = lua.to_string(1) {
+		lua.traceback(&lua, msg, 1);
+		return 1
+	}
+
+	let ok = lua.run_managed(|mut mg| {
+		mg.call_metamethod(1, cstr!("__tostring"))
+	});
+
+	if ok && lua.type_of(-1) == Type::String {
+		return 1
+	}
+
+	push_fmt_string!(lua, "(error object is a %s value)", lua.type_name_of(1));
+
+	1
+}
+
+unsafe extern "C" fn l_main(l: *mut cdef::State) -> core::ffi::c_int {
+	let mut lua: Thread = Thread::from_ptr(l);
+	
+	lua.new_lib(&RS_LIB);
+	lua.set_global(cstr!("rs"));
+
+	lua.run_managed(|mut mg| mg.open_libs());
+
+	lua.push_c_function(l_msgh);
+	let base = lua.top();
+
+	let status = lua.load_file(TEST_FILE);
+	if !status.is_ok() {
+		lua.error()
+	}
+
+	lua.push_byte_str(b"Mega Serval");
+	let status = lua.run_managed(|mut mg| {
+		mg.restart_gc();
+		mg.pcall(1, 0, base)
+	});
+	if !report(&mut lua, status) { return 0 }
+		
+	lua.run_managed(|mut mg| mg.run_gc());
+
+	0
+}
+
 fn main() {
 	let Some(mut lua) = Lua::new_auxlib_default() else {
 		eprintln!("couldn't allocate Lua state");
 		return
 	};
 
-	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
-
-	unsafe { lua.register(
-		CStr::from_bytes_with_nul_unchecked(b"rs_print\0"),
-		l_rs_print
-	) };
-
-	let status = unsafe { lua.load_file(TEST_FILE) };
-	if !report(&mut lua, status) { return }
-
-	unsafe { lua.push_byte_str(b"Mega Serval") };
+	lua.push_c_function(l_main);
 	let status = lua.run_managed(|mut mg| {
 		mg.restart_gc();
-		mg.pcall(1, 0, 0)
+		mg.pcall(0, 0, 0)
 	});
 	if !report(&mut lua, status) { return }
-		
-	lua.run_managed(|mut mg| mg.run_gc());
 }

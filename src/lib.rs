@@ -1570,3 +1570,17 @@ impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
 		self.thread.close_as_coroutine()
 	}
 }
+
+#[macro_export]
+macro_rules! push_fmt_string {
+	($lua:expr, $fmt:literal $(, $fmt_arg:expr)*) => {{
+		let lua: &Thread = &$lua;
+		$crate::cdef::lua_pushfstring(
+			lua.as_ptr(),
+			core::ffi::CStr::from_bytes_with_nul_unchecked(
+				concat!($fmt, "\0").as_bytes()
+			).as_ptr()
+			$(, $fmt_arg)*
+		)
+	}};
+}

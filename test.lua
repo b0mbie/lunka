@@ -2,4 +2,6 @@
 -- Test code for Lua to run.
 
 print("I'm difficult-icult", ...)
-rs_print("Hello, Rust!", ...)
+rs.print("Hello, Rust!", ...)
+
+error("bee") -- bug
