@@ -150,7 +150,7 @@ pub const REGISTRY_INDEX: c_int = -MAX_STACK - 1000;
 /// Equivalent to the `lua_upvalueindex` C macro.
 /// 
 /// Even with the above, this constant function will never panic.
-pub const fn upvalue_index(i: c_int) -> c_int {
+pub const fn lua_upvalueindex(i: c_int) -> c_int {
 	REGISTRY_INDEX - i
 }
 
@@ -554,6 +554,7 @@ macro_rules! lua_state_func {
 }
 pub(crate) use lua_state_func;
 
+#[link(name = "lua54", kind = "raw-dylib")]
 extern "C" {
 	pub fn lua_newstate(f: Alloc, ud: *mut c_void) -> *mut State;
 	pub fn lua_close(l: *mut State);
@@ -902,7 +903,7 @@ pub unsafe fn lua_yield_in_hook(l: *mut State, n_results: c_int) -> c_int {
 /// The amount of extra space is defined in `LUA_EXTRASPACE` in the C header,
 /// however, it can always be changed. This is what the `extra_space` parameter
 /// is for.
-pub const unsafe fn get_extra_space(
+pub const unsafe fn lua_getextraspace(
 	l: *mut State, extra_space: usize
 ) -> *mut c_void {
 	l.byte_sub(extra_space) as *mut c_void

@@ -39,6 +39,7 @@ pub const PACKAGE_LIB_NAME: &'static CStr = unsafe {
 	CStr::from_bytes_with_nul_unchecked(b"package\0")
 };
 
+#[link(name = "lua54", kind = "raw-dylib")]
 extern "C" {
 	lua_state_func! {
 		pub fn luaopen_base(self) -> c_int;

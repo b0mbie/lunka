@@ -5,6 +5,9 @@ authors = [ "[aka]bomb" ]
 version = "0.1.0"
 edition = "2021"
 
+[[example]]
+name = "interpreter"
+
 [features]
 # Use definitions for 32 bits max.
 # This is analogous to the `LUA_32BITS` define, and should be set appropriately

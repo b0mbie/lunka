@@ -61,6 +61,7 @@ pub const NO_REF: c_int = -2;
 /// Constant that indicates a reference to `nil`.
 pub const REF_NIL: c_int = -1;
 
+#[link(name = "lua54", kind = "raw-dylib")]
 extern "C" {
 	pub fn luaL_newstate() -> *mut State;
 

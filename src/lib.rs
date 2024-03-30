@@ -35,29 +35,56 @@ pub mod errors;
 #[cfg(feature = "auxlib")]
 pub mod aux_options;
 pub mod cdef;
-pub use cdef::{
-	Number,
-	Integer,
-	Status,
-	Type,
-	upvalue_index
-};
 pub mod dbg_what;
-pub use dbg_what::*;
 #[cfg(feature = "auxlib")]
 pub mod reg;
 
-use crate::cdef::*;
+use cdef::*;
 
 #[cfg(feature = "auxlib")]
-use auxlib::*;
-
-#[cfg(feature = "auxlib")]
-pub use {
-	auxlib::Reg,
+use {
+	auxlib::*,
 	aux_options::*,
 	reg::*
 };
+
+pub mod prelude {
+	//! Prelude that re-exports useful things, but prepends `Lua` or `lua_` to
+	//! them to prevent name clashes.
+
+	#[cfg(feature = "auxlib")]
+	pub use {
+		crate::auxlib::Reg as LuaReg,
+		crate::aux_options::AuxOptions as LuaAuxOptions,
+		crate::cdef::{
+			Alloc as LuaAlloc,
+			Arith as LuaArith,
+			CFunction as LuaCFunction,
+			Compare as LuaCompare,
+			Debug as LuaDebug,
+			Integer as LuaInteger,
+			KContext as LuaKContext,
+			KFunction as LuaKFunction,
+			Number as LuaNumber,
+			Reader as LuaReader,
+			State as LuaState,
+			Status as LuaStatus,
+			Type as LuaType,
+			Unsigned as LuaUnsigned,
+			WarnFunction as LuaWarnFunction,
+			Writer as LuaWriter,
+			DEFAULT_ID_SIZE as LUA_DEFAULT_ID_SIZE,
+			lua_upvalueindex as lua_upvalue_index
+		},
+		crate::dbg_what::DebugWhat as LuaDebugWhat,
+		crate::reg::Library as LuaLibrary,
+		crate::Lua,
+		crate::Coroutine as LuaCoroutine,
+		crate::Thread as LuaThread,
+		crate::lua_fmt_error,
+		crate::lua_push_fmt_string
+	};
+}
 
 /// Lua garbage collection mode setup information.
 /// 
@@ -523,6 +550,8 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 
 #[cfg(feature = "stdlibs")]
 impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+	/// Open all standard Lua libraries into the associated Lua thread.
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
@@ -533,6 +562,17 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 
 #[cfg(feature = "auxlib")]
 impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+	/// Call a metamethod `event` on the object at index `obj_index`.
+	/// 
+	/// If the object at index `obj_index` has a metatable and this metatable
+	/// has a field `event`, this function calls this field passing the object
+	/// as its only argument. 
+	/// In this case, this function returns `true` and pushes onto the stack the
+	/// value returned by the call.
+	/// 
+	/// If there is no metatable or no metamethod, this function returns `false`
+	/// without pushing any value on the stack. 
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
@@ -546,6 +586,8 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		) }) != 0
 	}
 
+	/// Load and run the given file.
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
@@ -553,11 +595,19 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		unsafe { luaL_dofile(self.l, file_name.as_ptr()) }
 	}
 
+	/// Load and run the given string.
+	/// 
 	#[inline(always)]
 	pub fn do_string(&mut self, code: &CStr) -> bool {
 		unsafe { luaL_dostring(self.l, code.as_ptr()) }
 	}
 
+	/// Ensure that the value `t[table_name]`, where `t` is the value at index
+	/// `parent_index`, is a table, and push that table onto the stack.
+	/// 
+	/// This function returns `true` if it finds a previous table there and
+	/// `false` if it creates a new table.
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
@@ -571,10 +621,34 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		) }) != 0
 	}
 
+	/// Return the "length" of the value at the given index as a number.
+	/// 
+	/// This function is equivalent to the `#` operator in Lua.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise an [error](crate::errors) if the
+	/// result of the operation is not an integer.
+	/// (This case can only happen through metamethods.)
+	/// 
+	/// It can also raise an error from a metamethod.
+	pub unsafe fn meta_length_of(&mut self, obj_index: c_int) -> Integer {
+		unsafe { luaL_len(self.l, obj_index) }
+	}
+
+	/// Convert any Lua value at the given index to a string in a reasonable
+	/// format, and push that string onto the stack.
+	/// 
+	/// The string returned by the function is represented as a slice of
+	/// [`c_char`]s.
+	/// 
+	/// If the value has a metatable with a `__tostring` field, then this
+	/// function calls the corresponding metamethod with the value as argument,
+	/// and uses the result of the call as its result.
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_chars_aux(&'l mut self, index: c_int) -> Option<&'l [c_char]> {
+	pub unsafe fn to_chars_meta(&'l mut self, index: c_int) -> Option<&'l [c_char]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
@@ -590,7 +664,7 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_byte_str_aux(&'l mut self, index: c_int) -> Option<&'l [u8]> {
+	pub unsafe fn to_byte_str_meta(&'l mut self, index: c_int) -> Option<&'l [u8]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
@@ -645,6 +719,10 @@ macro_rules! lua_is {
 }
 
 impl<const ID_SIZE: usize> Thread<ID_SIZE> {
+	/// Construct a [`Thread`] from a raw C pointer to a Lua state.
+	/// 
+	/// # Safety
+	/// `l` must point to a valid Lua state (`lua_State` in C).
 	#[inline(always)]
 	pub const unsafe fn from_ptr(l: *mut State) -> Self {
 		Self {
@@ -652,11 +730,14 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		}
 	}
 
+	/// Return the raw C pointer that represents the underlying Lua state.
 	#[inline(always)]
 	pub const fn as_ptr(&self) -> *mut State {
 		self.l
 	}
 
+	/// Run code that can restart the GC and potentially invalidate pointers
+	/// in a context.
 	#[inline(always)]
 	pub fn run_managed<R>(&mut self, func: impl FnOnce(Managed<'_>) -> R) -> R {
 		let result = func(Managed {
@@ -1783,7 +1864,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 
 	/// Gets information about a specific function or function invocation.
 	/// 
-	/// See also [`DebugWhat`] for generating `what`.
+	/// See also [`DebugWhat`](dbg_what::DebugWhat) for generating `what`.
 	#[inline(always)]
 	pub fn get_info(&self, what: &CStr, ar: &mut Debug<ID_SIZE>) -> bool {
 		(unsafe { lua_getinfo(self.l, what.as_ptr(), ar) }) != 0
@@ -1958,7 +2039,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 }
 
-unsafe impl Allocator for Lua {
+unsafe impl<const ID_SIZE: usize> Allocator for Lua<ID_SIZE> {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		let (alloc, ud) = self.get_alloc_fn();
 		let len = layout.size();
@@ -2589,15 +2670,21 @@ impl Lua<DEFAULT_ID_SIZE> {
 	pub fn new_auxlib_default() -> Option<Self> {
 		Self::new_auxlib()
 	}
+
+	pub fn new_default() -> Option<Self> {
+		Self::new()
+	}
 }
 
 impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	#[inline(always)]
 	unsafe fn from_l(l: *mut State) -> Option<Self> {
 		if !l.is_null() {
-			Some(Self {
+			let lua = Self {
 				thread: unsafe { Thread::from_ptr(l) }
-			})
+			};
+			lua.stop_gc();
+			Some(lua)
 		} else {
 			None
 		}
@@ -2737,7 +2824,7 @@ impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
 #[macro_export]
 macro_rules! lua_push_fmt_string {
 	($lua:expr, $fmt:literal $(, $fmt_arg:expr)*) => {{
-		let lua: &Thread = &$lua;
+		let lua: &$crate::Thread = &$lua;
 		$crate::cdef::lua_pushfstring(
 			lua.as_ptr(),
 			core::ffi::CStr::from_bytes_with_nul_unchecked(
