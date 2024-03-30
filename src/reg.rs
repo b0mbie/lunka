@@ -11,6 +11,8 @@ use core::mem::{
 use core::ptr::null;
 use core::slice::from_raw_parts;
 
+/// List of registered C functions to be used with
+/// [`Thread::new_lib`](crate::Thread::new_lib).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct Library<'name, const N: usize> {
@@ -20,6 +22,7 @@ pub struct Library<'name, const N: usize> {
 }
 
 impl<'name, const N: usize> Library<'name, N> {
+	/// Construct an instance of [`Library`] with a static list of functions.
 	pub const fn new(
 		items: [(&'name CStr, CFunction); N]
 	) -> Self {
@@ -50,14 +53,17 @@ impl<'name, const N: usize> Library<'name, N> {
 		}
 	}
 
+	/// Return the number of functions registered, plus `1`.
 	pub const fn ffi_len() -> usize {
 		N + 1
 	}
 
+	/// Return a pointer to this structure to be used with FFI.
 	pub const fn as_ptr(&self) -> *const Reg {
 		unsafe { transmute(self as *const _) }
 	}
 
+	/// Return a slice of [`Reg`]s that represent the registered functions.
 	pub const fn as_reg_slice(&self) -> &[Reg] {
 		unsafe { from_raw_parts(
 			transmute(self as *const _ as *const Reg), N + 1
