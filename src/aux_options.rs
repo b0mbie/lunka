@@ -11,6 +11,8 @@ use core::mem::{
 use core::ptr::null;
 use core::slice::from_raw_parts;
 
+/// List of string options to be used with
+/// [`Thread::check_option`](crate::Thread::check_option).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct AuxOptions<'str, const N: usize> {
@@ -20,9 +22,10 @@ pub struct AuxOptions<'str, const N: usize> {
 }
 
 impl<'str, const N: usize> AuxOptions<'str, N> {
+	/// Construct an instance of [`AuxOptions`] with a static list of options.
 	pub const fn new(items: [&'str CStr; N]) -> Self {
-		// SAFETY: We make an uninit `[Reg; N]`, but then immediately fill it
-		// with stuff without reading from it.
+		// SAFETY: We make an uninit `[*const c_char; N]`, but then immediately
+		// fill it with stuff without reading from it.
 		let regs: [*const c_char; N] = unsafe {
 			let mut dest: [*const c_char; N] = MaybeUninit::uninit().assume_init();
 	
@@ -42,14 +45,18 @@ impl<'str, const N: usize> AuxOptions<'str, N> {
 		}
 	}
 
+	/// Return the number of options that this list has.
 	pub const fn count() -> usize {
 		N
 	}
 
+	/// Return a pointer to this structure to be used with FFI.
 	pub const fn as_ptr(&self) -> *const *const c_char {
 		unsafe { transmute(self as *const _) }
 	}
 
+	/// Return a slice of [`*const c_char`](c_char)s that represent the string
+	/// options contained within the structure.
 	pub const fn as_str_ptr_slice(&self) -> &[*const c_char] {
 		unsafe { from_raw_parts(
 			transmute(self as *const _ as *const c_char), N + 1
