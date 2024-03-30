@@ -659,8 +659,8 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		}
 	}
 
-	/// Works the same as [`Managed::to_chars_aux`], however it returns an array
-	/// of [`u8`]s instead of [`c_char`]s.
+	/// Works the same as [`Managed::to_chars_meta`], however it returns an
+	/// array of [`u8`]s instead of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
