@@ -761,7 +761,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// metamethods, or it triggers metamethods that can't ever cause the
 	/// collector to collect, then this invariant is not broken.
 	#[inline(always)]
-	pub fn run_managed_no_gc<R>(&self, func: impl FnOnce(Managed<'_>) -> R) -> R {
+	pub unsafe fn run_managed_no_gc<R>(
+		&self,
+		func: impl FnOnce(Managed<'_>) -> R
+	) -> R {
 		func(Managed {
 			l: self.l,
 			_life: PhantomData
@@ -771,14 +774,36 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Close all active to-be-closed variables in the main thread, release all
 	/// objects (calling the corresponding garbage-collection metamethods, if
 	/// any), and free all dynamic memory used by this [`Thread`].
+	/// 
+	/// # Safety
+	/// This [`Thread`] must not be used for any further API calls, as the
+	/// underlying Lua pointer becomes invalid after this call.
 	#[inline(always)]
 	pub unsafe fn close_as_main(&mut self) {
 		lua_close(self.l)
 	}
 
+	/// Reset a thread, cleaning its call stack and closing all pending
+	/// to-be-closed variables.
+	/// 
+	/// Returns a status code: [`Status::Ok`] for no errors in the thread
+	/// (either the original error that stopped the thread or errors in closing
+	/// methods), or an error status otherwise.
+	/// 
+	/// In case of error, leaves the error object on the top of its own stack.
 	#[inline(always)]
 	pub fn close_as_coroutine(&mut self) -> Status {
 		unsafe { Status::from_c_int_unchecked(lua_resetthread(self.l)) }
+	}
+
+	/// This behaves similarly to [`Thread::close_as_coroutine`], but allows to
+	/// specify `from`, which represents the coroutine that is resetting this
+	/// one.
+	#[inline(always)]
+	pub fn close_as_coroutine_from(&mut self, from: &Self) -> Status {
+		unsafe { Status::from_c_int_unchecked(
+			lua_closethread(self.l, from.as_ptr())
+		) }
 	}
 
 	/// Set a new panic function and return the old one.
@@ -1475,7 +1500,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// - Call this function.
 	#[inline(always)]
 	pub fn resume(
-		&self, from: Option<&Thread>,
+		&self, from: Option<&Self>,
 		n_args: c_int
 	) -> (Status, c_int) {
 		let mut n_res = 0;
@@ -1750,7 +1775,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// This function pops `n_values` values from the stack of this thread, and
 	/// pushes them onto the stack of the thread `to`.
 	#[inline(always)]
-	pub fn xmove(&self, to: &Thread, n_values: c_uint) {
+	pub fn xmove(&self, to: &Self, n_values: c_uint) {
 		unsafe { lua_xmove(self.l, to.as_ptr(), n_values as _) }
 	}
 
@@ -2576,7 +2601,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
 	pub unsafe fn traceback(
-		&self, of: &Thread,
+		&self, of: &Self,
 		message: Option<&CStr>,
 		level: c_int
 	) {
@@ -2671,10 +2696,18 @@ impl<const ID_SIZE: usize> DerefMut for Lua<ID_SIZE> {
 
 #[cfg(feature = "auxlib")]
 impl Lua<DEFAULT_ID_SIZE> {
+	/// Potentially construct a new [`Lua`] with the default `ID_SIZE` of
+	/// [`DEFAULT_ID_SIZE`], using the `lauxlib` function [`luaL_newstate`].
+	/// 
+	/// The function will return `None` if allocation failed.
 	pub fn new_auxlib_default() -> Option<Self> {
 		Self::new_auxlib()
 	}
 
+	/// Potentially Construct a new [`Lua`] with the default `ID_SIZE` of
+	/// [`DEFAULT_ID_SIZE`], using the [`Global`] Rust allocator.
+	/// 
+	/// The function will return `None` if allocation failed.
 	pub fn new_default() -> Option<Self> {
 		Self::new()
 	}
@@ -2694,12 +2727,18 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 		}
 	}
 
+	/// Construct a new [`Lua`] using the `lauxlib` function [`luaL_newstate`].
+	/// 
+	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "auxlib")]
 	#[inline(always)]
 	pub fn new_auxlib() -> Option<Self> {
 		unsafe { Self::from_l(luaL_newstate()) }
 	}
 
+	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
+	/// 
+	/// The function will return `None` if allocation failed.
 	#[inline(always)]
 	pub fn new_with_alloc_fn(
 		alloc_fn: Alloc, alloc_fn_data: *mut c_void
@@ -2707,6 +2746,9 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 		unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
+	/// Construct a new [`Lua`] using the [`Global`] Rust allocator.
+	/// 
+	/// The function will return `None` if allocation failed.
 	#[inline(always)]
 	pub fn new() -> Option<Self> {
 		// TODO: Is this right for emulating `malloc`?
@@ -2761,8 +2803,13 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 		unsafe { Self::from_l(lua_newstate(l_alloc, null_mut())) }
 	}
 
+	/// Construct a new [`Lua`] using an already-allocated Lua state, and set
+	/// its panic function to [`lua_panic`].
+	/// 
+	/// # Safety
+	/// `l` must be a valid pointer to a Lua state.
 	#[inline(always)]
-	pub unsafe fn from_ptr(l: *mut cdef::State) -> Self {
+	pub unsafe fn from_ptr(l: *mut State) -> Self {
 		let thread = Thread::from_ptr(l);
 		thread.at_panic(Some(lua_panic));
 		Self {
@@ -2770,8 +2817,9 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 		}
 	}
 
+	/// Return the raw pointer to the underlying Lua state.
 	#[inline(always)]
-	pub const fn as_ptr(&self) -> *mut cdef::State {
+	pub const fn as_ptr(&self) -> *mut State {
 		self.thread.as_ptr()
 	}
 }
@@ -2794,8 +2842,14 @@ pub struct Coroutine<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {
 }
 
 impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
+	/// Alias to [`Thread::close_as_coroutine`].
 	pub fn close(&mut self) -> Status {
 		self.thread.close_as_coroutine()
+	}
+
+	/// Alias to [`Thread::close_as_coroutine`].
+	pub fn close_from(&mut self, from: &Self) -> Status {
+		self.thread.close_as_coroutine_from(&from.thread)
 	}
 }
 
@@ -2853,7 +2907,7 @@ macro_rules! lua_push_fmt_string {
 #[macro_export]
 macro_rules! lua_fmt_error {
 	($lua:expr, $fmt:literal $(, $fmt_arg:expr)*) => {{
-		let lua: &Thread = &$lua;
+		let lua: &$crate::Thread = &$lua;
 		$crate::cdef::auxlib::luaL_error(
 			lua.as_ptr(),
 			core::ffi::CStr::from_bytes_with_nul_unchecked(
