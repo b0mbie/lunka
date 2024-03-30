@@ -2155,7 +2155,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	pub unsafe fn check_option<const N: usize>(
 		&self, arg: c_int,
 		default: Option<&CStr>,
-		list: AuxOptions<'_, N>
+		list: &AuxOptions<'_, N>
 	) -> usize {
 		(unsafe { luaL_checkoption(
 			self.l, arg,
