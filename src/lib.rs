@@ -2504,8 +2504,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// `store_index`, this function ensures the uniqueness of the key it
 	/// returns.
 	/// 
-	/// You can retrieve an object referred by the reference r by calling
-	/// [`thread.raw_get_i(store_index, ref_idx)`](Thread::raw_get_i).
+	/// You can retrieve an object referred by the reference `ref_idx` by
+	/// calling [`thread.raw_get_i(store_index, ref_idx)`](Thread::raw_get_i).
 	/// See also [`Thread::destroy_ref`], which frees a reference.
 	/// 
 	/// If the object on the top of the stack is nil, this returns the constant
@@ -2847,7 +2847,7 @@ impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
 		self.thread.close_as_coroutine()
 	}
 
-	/// Alias to [`Thread::close_as_coroutine`].
+	/// Alias to [`Thread::close_as_coroutine_from`].
 	pub fn close_from(&mut self, from: &Self) -> Status {
 		self.thread.close_as_coroutine_from(&from.thread)
 	}
