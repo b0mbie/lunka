@@ -2,6 +2,7 @@
 name = "lunka"
 description = "`#![no_std]` bindings to Lua 5.4"
 authors = [ "[aka]bomb" ]
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
