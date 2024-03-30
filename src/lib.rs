@@ -156,7 +156,8 @@ pub enum GcMode {
 
 /// Lua thread wrapper that's used by [`Lua`] and associated structures.
 /// 
-/// [`Lua`], [`Managed`] and [`Coroutine`] implement [`Deref`] to this type.
+/// [`Lua`], [`Managed`] and [`Coroutine`] implement [`Deref`] and [`DerefMut`]
+/// to this type.
 /// 
 /// # Borrowing
 /// Most methods borrow instances of this type immutably, even though, at least
@@ -722,7 +723,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Construct a [`Thread`] from a raw C pointer to a Lua state.
 	/// 
 	/// # Safety
-	/// `l` must point to a valid Lua state (`lua_State` in C).
+	/// `l` must point to a valid Lua state (`lua_State *` in C).
 	#[inline(always)]
 	pub const unsafe fn from_ptr(l: *mut State) -> Self {
 		Self {
@@ -893,7 +894,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_createtable(self.l, n_arr as _, n_rec as _) }
 	}
 
-	/// Dump a function as a binary chunk.
+	/// Dump a function as a binary chunk, and return the status of the
+	/// operation.
 	/// 
 	/// This function receives a Lua function on the top of the stack and
 	/// produces a binary chunk that, if loaded again, results in a function
@@ -913,12 +915,12 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		&self,
 		writer: Writer, writer_data: *mut c_void,
 		strip_debug_info: bool
-	) -> Status {
-		unsafe { Status::from_c_int_unchecked(lua_dump(
+	) -> c_int {
+		unsafe { lua_dump(
 			self.l,
 			writer, writer_data,
 			if strip_debug_info { 1 } else { 0 }
-		)) }
+		) }
 	}
 
 	/// Return the memory-allocation function of this [`Thread`] along with the
@@ -1040,11 +1042,13 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	/// Load a Lua chunk without running it.
+	/// 
 	/// If there are no errors, push the compiled chunk as a Lua function.
 	/// Otherwise, push an error message.
 	/// 
-	/// This function uses a user-supplied `reader` to read the chunk (see also [`Reader`]).
-	/// `data` is an opaque value passed to the reader function.
+	/// This function uses a user-supplied `reader` to read the chunk (see also
+	/// [`Reader`]).
+	/// `reader_data` is an opaque value passed to the reader function.
 	/// 
 	/// `chunk_name` gives a name to the chunk, which is used for error messages
 	/// and in debug information.
@@ -1069,13 +1073,13 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	#[inline(always)]
 	pub fn load(
 		&self,
-		reader: Reader, data: *mut c_void,
+		reader: Reader, reader_data: *mut c_void,
 		chunk_name: &CStr, mode: Option<&CStr>
 	) -> Status {
 		unsafe { Status::from_c_int_unchecked(
 			lua_load(
 				self.l,
-				reader, data,
+				reader, reader_data,
 				chunk_name.as_ptr(),
 				mode.map(|cstr| cstr.as_ptr()).unwrap_or(null())
 			)

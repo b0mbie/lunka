@@ -371,25 +371,57 @@ pub struct State {
 /// C functions accept a pointer to a Lua state that they can manipulate.
 /// If a C function pushes some values onto the Lua stack that it wishes to
 /// return, then it must return the number of values it wants to return.
+/// 
+/// # Safety
+/// When a C function is called from Lua, `l` always points to a valid Lua state.
+/// However, **it is not guaranteed that the garbage collector is off**.
+/// 
+/// If code requires that the garbage collector is off (i.e. if pointers from
+/// Lua are used after a call to
+/// [`Thread::run_managed_no_gc`](crate::Thread::run_managed_no_gc)), then
+/// garbage collection must be manually stopped.
 pub type CFunction = unsafe extern "C" fn (l: *mut State) -> c_int;
 
 /// Continuation function.
 /// Also known as `lua_KFunction`.
+/// 
+/// # Safety
+/// When a continuation is called from Lua, `l` always points to a valid Lua
+/// state, and `ctx` is always the continuation context that was passed along
+/// with the continuation function.
+/// 
+/// `status` is generally also a valid [`Status`].
 pub type KFunction = unsafe extern "C" fn (
 	l: *mut State, status: c_int, ctx: KContext
 ) -> c_int;
 
 /// Function that reads blocks when loading Lua chunks.
 /// Also known as `lua_Reader`.
+/// 
+/// # Safety
+/// When a reader function is used by Lua, `l` always points to a valid Lua
+/// state, `ud` is always the user-defined data that was passed along with the
+/// reader function, and `sz` is always a pointer to [`usize`] that's valid for
+/// writes.
+/// 
+/// The returned value must be a valid pointer to a string, or a null pointer if
+/// no data is available. The pointer must be valid for reading at least until
+/// the next usage of the function.
 pub type Reader = unsafe extern "C" fn (
 	l: *mut State, ud: *mut c_void, sz: *mut usize
 ) -> *const c_char;
 
 /// Function that writes blocks when dumping Lua chunks.
 /// Also known as `lua_Writer`.
+/// 
+/// # Safety
+/// When a writer function is used by Lua, `l` always points to a valid Lua
+/// state, `ud` is always the user-defined data that was passed along with the
+/// reader function, and `p` is always a pointer that's valid for reading that
+/// points to a memory block of size `sz` bytes.
 pub type Writer = unsafe extern "C" fn (
 	l: *mut State, p: *const c_void, sz: usize, ud: *mut c_void
-) -> *const c_char;
+) -> c_int;
 
 /// Memory allocation function.
 /// Also known as `lua_Alloc`.
