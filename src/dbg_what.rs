@@ -34,6 +34,9 @@ impl DebugWhat {
 
 	/// Write out a "what" string into `buffer` and return the slice that
 	/// contains it.
+	/// 
+	/// The maximum number of C characters that can be written to `buffer` is
+	/// `10`, including the zero-terminator.
 	pub fn write_string<'a>(&self, buffer: &'a mut [c_char]) -> &'a [c_char] {
 		let flags = self.what_flags;
 	
