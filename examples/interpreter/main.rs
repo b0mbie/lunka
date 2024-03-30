@@ -88,7 +88,10 @@ unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
 		arg_count += 1;
 	}
 
-	let run_status = lua.run_managed(|mut mg| mg.pcall(arg_count, 0, base));
+	let run_status = lua.run_managed(|mut mg| {
+		mg.restart_gc();
+		mg.pcall(arg_count, 0, base)
+	});
 	if !report(&mut lua, run_status) {
 		return 0
 	}
