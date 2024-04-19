@@ -29,8 +29,9 @@ use core::slice::{
 	from_raw_parts, from_raw_parts_mut
 };
 
-#[cfg(doc)]
-pub mod errors;
+#[cfg(any(doc, doctest))]
+#[cfg_attr(any(doc, doctest), doc = include_str!("../doc/errors.md"))]
+pub mod errors {}
 
 #[cfg(feature = "auxlib")]
 pub mod aux_options;
