@@ -101,7 +101,7 @@ unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
 }
 
 fn main() -> ExitCode {
-	let Some(mut lua) = Lua::new_default() else {
+	let Some(mut lua) = Lua::new() else {
 		eprintln!("cannot create state: not enough memory");
 		return ExitCode::FAILURE
 	};

@@ -2703,16 +2703,16 @@ impl Lua<DEFAULT_ID_SIZE> {
 	/// [`DEFAULT_ID_SIZE`], using the `lauxlib` function [`luaL_newstate`].
 	/// 
 	/// The function will return `None` if allocation failed.
-	pub fn new_auxlib_default() -> Option<Self> {
-		Self::new_auxlib()
+	pub fn new_auxlib() -> Option<Self> {
+		Self::new_auxlib_with()
 	}
 
 	/// Potentially Construct a new [`Lua`] with the default `ID_SIZE` of
 	/// [`DEFAULT_ID_SIZE`], using the [`Global`] Rust allocator.
 	/// 
 	/// The function will return `None` if allocation failed.
-	pub fn new_default() -> Option<Self> {
-		Self::new()
+	pub fn new() -> Option<Self> {
+		Self::new_with()
 	}
 }
 
@@ -2735,7 +2735,7 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "auxlib")]
 	#[inline(always)]
-	pub fn new_auxlib() -> Option<Self> {
+	pub fn new_auxlib_with() -> Option<Self> {
 		unsafe { Self::from_l(luaL_newstate()) }
 	}
 
@@ -2753,7 +2753,7 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[inline(always)]
-	pub fn new() -> Option<Self> {
+	pub fn new_with() -> Option<Self> {
 		// TODO: Is this right for emulating `malloc`?
 		unsafe extern "C" fn l_alloc(
 			_ud: *mut c_void,
