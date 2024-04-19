@@ -1363,9 +1363,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Without calling metamethods, push `t[k]`, where `t` is the value at the
 	/// given index and `k` is the value on the top of the stack.
 	/// 
+	/// # Safety
 	/// The value at `tbl_index` must be a table.
 	#[inline(always)]
-	pub fn raw_get(&self, tbl_index: c_int) -> Type {
+	pub unsafe fn raw_get(&self, tbl_index: c_int) -> Type {
 		unsafe { Type::from_c_int_unchecked(
 			lua_rawget(self.l, tbl_index)
 		) }
@@ -1374,9 +1375,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Without calling metamethods, push `t[i]`, where `t` is the value at the
 	/// given index.
 	/// 
+	/// # Safety
 	/// The value at `tbl_index` must be a table.
 	#[inline(always)]
-	pub fn raw_get_i(&self, tbl_index: c_int, i: Integer) -> Type {
+	pub unsafe fn raw_get_i(&self, tbl_index: c_int, i: Integer) -> Type {
 		unsafe { Type::from_c_int_unchecked(
 			lua_rawgeti(self.l, tbl_index, i)
 		) }
@@ -1386,9 +1388,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// the given index and `ptr` is the given pointer represented as a light
 	/// userdata.
 	/// 
+	/// # Safety
 	/// The value at `tbl_index` must be a table.
 	#[inline(always)]
-	pub fn raw_get_p(&self, tbl_index: c_int, ptr: *const c_void) -> Type {
+	pub unsafe fn raw_get_p(&self, tbl_index: c_int, ptr: *const c_void) -> Type {
 		unsafe { Type::from_c_int_unchecked(
 			lua_rawgetp(self.l, tbl_index, ptr)
 		) }
@@ -1411,10 +1414,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// index, `v` is the value on the top of the stack, and `k` is the value
 	/// just below the top.
 	/// 
-	/// The value at `tbl_index` must be a table.
-	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// Also, the value at `tbl_index` must be a table.
 	#[inline(always)]
 	pub unsafe fn raw_set(&self, tbl_index: c_int) {
 		unsafe { lua_rawset(self.l, tbl_index) }
@@ -1423,10 +1426,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Without metamethods, do `t[i] = v`, where `t` is the value at the given
 	/// index and `v` is the value on the top of the stack.
 	/// 
-	/// The value at `tbl_index` must be a table.
-	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// Also, the value at `tbl_index` must be a table.
 	#[inline(always)]
 	pub unsafe fn raw_set_i(&self, tbl_index: c_int, i: Integer) {
 		unsafe { lua_rawseti(self.l, tbl_index, i) }
@@ -1436,10 +1439,10 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// given index, `v` is the value on the top of the stack, and `ptr` is the
 	/// given pointer represented as a light userdata.
 	/// 
-	/// The value at `tbl_index` must be a table.
-	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// Also, the value at `tbl_index` must be a table.
 	#[inline(always)]
 	pub unsafe fn raw_set_p(&self, tbl_index: c_int, ptr: *const c_void) {
 		unsafe { lua_rawsetp(self.l, tbl_index, ptr) }
