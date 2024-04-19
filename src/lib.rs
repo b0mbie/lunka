@@ -307,6 +307,21 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 		) }
 	}
 
+	/// Close the to-be-closed slot at the given index and set its value to `nil`.
+	/// 
+	/// A `__close` metamethod cannot yield when called through this function.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors)
+	/// from the `__close` metamethod.
+	/// 
+	/// The index must be the last index previously marked to be closed that is
+	/// still active (that is, not closed yet).
+	#[inline(always)]
+	pub unsafe fn close_slot(&mut self, index: c_int) {
+		unsafe { lua_closeslot(self.l, index) }
+	}
+
 	/// Compare two Lua values.
 	/// 
 	/// Returns `true` if the value at `idx_a` satisfies `operation` when
@@ -1603,6 +1618,34 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_tocfunction(self.l, index) }
 	}
 
+	/// Mark the given index in the stack as a to-be-closed slot.
+	/// 
+	/// Like a to-be-closed variable in Lua, the value at that slot in the stack
+	/// will be closed when it goes out of scope.
+	/// Here, in the context of a C function, to go out of scope means that the
+	/// running function returns to Lua, or there is an error, or the slot is
+	/// removed from the stack through [`Managed::set_top`] or [`Managed::pop`],
+	/// or there is a call to [`Managed::close_slot`].
+	/// 
+	/// A slot marked as to-be-closed should not be removed from the stack by
+	/// any other function in the API except [`Managed::set_top`] or
+	/// [`Managed::pop`], unless previously deactivated by [`Managed::close_slot`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// This function should not be called for an index that is equal to or
+	/// below an active to-be-closed slot.
+	/// 
+	/// Note that, both in case of errors and of a regular return, by the time
+	/// the __close metamethod runs, the C stack was already unwound, so that
+	/// any automatic C variable declared in the calling function
+	/// (e.g., a buffer) will be out of scope.
+	#[inline(always)]
+	pub unsafe fn to_close(&self, index: c_int) {
+		unsafe { lua_toclose(self.l, index) }
+	}
+
 	/// This behaves exactly the same as [`Thread::to_integer_opt`], however the
 	/// return value is `0` if an integer isn't present.
 	#[inline(always)]
@@ -1633,7 +1676,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// The function returns a slice to data inside the Lua state.
 	/// This string always has a zero (`'\0'`) after its last character (as in C),
-	/// but can contain other zeros in its body. 
+	/// but can contain other zeros in its body.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
