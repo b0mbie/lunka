@@ -501,8 +501,8 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn pop(&mut self, n: c_int) {
-		unsafe { lua_pop(self.l, n) }
+	pub unsafe fn pop(&mut self, n: c_uint) {
+		unsafe { lua_pop(self.l, n as _) }
 	}
 
 	/// Do the equivalent to `t[key] = v`, where `t` is the value at the given
