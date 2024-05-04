@@ -24,7 +24,7 @@ pub struct Library<'name, const N: usize> {
 impl<'name, const N: usize> Library<'name, N> {
 	/// Construct an instance of [`Library`] with a static list of functions.
 	pub const fn new(
-		items: [(&'name CStr, CFunction); N]
+		items: [(&'name CStr, Option<CFunction>); N]
 	) -> Self {
 		// SAFETY: We make an uninit `[Reg; N]`, but then immediately fill it
 		// with stuff without reading from it.
@@ -35,7 +35,7 @@ impl<'name, const N: usize> Library<'name, N> {
 			while i < N {
 				dest[i] = Reg {
 					name: items[i].0.as_ptr(),
-					func: Some(items[i].1)
+					func: items[i].1
 				};
 				i += 1;
 			}
