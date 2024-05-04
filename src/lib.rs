@@ -1337,6 +1337,12 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 		unsafe { lua_pushnil(self.l) }
 	}
 
+	/// Push a [`Number`] onto the stack.
+	#[inline(always)]
+	pub fn push_number(&self, value: Number) {
+		unsafe { lua_pushnumber(self.l, value) }
+	}
+
 	/// Push a zero-terminated string onto the stack.
 	/// 
 	/// Lua will make or reuse an internal copy of the given string, so the
