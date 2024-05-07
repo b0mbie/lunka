@@ -1850,7 +1850,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// # Safety
 	/// This function should be called *only* outside of hooks.
 	/// It is Undefined Behavior if the code after a call to this function is
-	/// reachable.
+	/// unreachable.
 	#[inline(always)]
 	pub unsafe fn yield_in_hook_with(&self, n_results: c_int) {
 		unsafe { lua_yield_in_hook(self.l, n_results) };
@@ -2426,7 +2426,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// This function uses [`Thread::load`] to load the chunk.
 	/// 
-	/// The first line in the file is ignored if it starts with a #.
+	/// The first line in the file is ignored if it starts with a `#`.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -2479,7 +2479,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
-	/// argument `arg` isn't a mumber, isn't a `nil` and not absent.
+	/// argument `arg` isn't a number, isn't a `nil` and not absent.
 	pub unsafe fn opt_integer(&self, arg: c_int, default: Integer) -> Integer {
 		unsafe { luaL_optinteger(self.l, arg, default) }
 	}
@@ -2526,7 +2526,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
-	/// argument `arg` isn't a mumber, isn't a `nil` and not absent.
+	/// argument `arg` isn't a number, isn't a `nil` and not absent.
 	pub unsafe fn opt_number(&self, arg: c_int, default: Number) -> Number {
 		unsafe { luaL_optnumber(self.l, arg, default) }
 	}
