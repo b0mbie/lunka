@@ -258,7 +258,6 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 					}
 				}
 			} else {
-				debug_assert!(nsize > 0);
 				Global.allocate(Layout::from_size_align_unchecked(
 					nsize, align_of::<usize>()
 				))
