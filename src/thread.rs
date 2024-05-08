@@ -69,10 +69,11 @@ macro_rules! lua_is {
 	};
 }
 
-/// Lua thread wrapper that's used by [`Lua`] and associated structures.
+/// Lua thread wrapper that's used by [`Lua`](crate::Lua) and associated
+/// structures.
 /// 
-/// [`Lua`], [`Managed`] and [`Coroutine`] implement [`Deref`] and [`DerefMut`]
-/// to this type.
+/// [`Lua`](crate::Lua), [`Managed`] and [`Coroutine`] implement
+/// [`Deref`](core::ops::Deref) and [`DerefMut`](core::ops::DerefMut) to this type.
 /// 
 /// # Borrowing
 /// Most methods borrow instances of this type immutably, even though, at least
@@ -86,8 +87,9 @@ macro_rules! lua_is {
 /// pointers that the C API returns, though they are converted to references for
 /// the Rust borrow checker to ensure safety.
 /// The Lua garbage collector will not invalidate any pointers if it is stopped.
-/// [`Lua`] will usually force the garbage collector to stay off with an API
-/// call if the code has declared that some pointers must not be invalidated.
+/// [`Lua`](crate::Lua) will usually force the garbage collector to stay off
+/// with an API call if the code has declared that some pointers must not be
+/// invalidated.
 /// 
 /// To call API functions that can potentially enable the GC, it is required
 /// that any references that have been acquired previously from a [`Thread`] are
@@ -735,7 +737,8 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	}
 
 	/// Push the Lua thread represented by this [`Thread`] onto its own stack,
-	/// and return `true` if this thread is the main thread (see also [`Lua`]).
+	/// and return `true` if this thread is the main thread
+	/// (see also [`Lua`](crate::Lua)).
 	#[inline(always)]
 	pub fn push_thread(&self) -> bool {
 		(unsafe { lua_pushthread(self.l) }) != 0
@@ -1320,7 +1323,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 
 	/// Gets information about a specific function or function invocation.
 	/// 
-	/// See also [`DebugWhat`](dbg_what::DebugWhat) for generating `what`.
+	/// See also [`DebugWhat`](crate::dbg_what::DebugWhat) for generating `what`.
 	#[inline(always)]
 	pub fn get_info(&self, what: &CStr, ar: &mut Debug<ID_SIZE>) -> bool {
 		(unsafe { lua_getinfo(self.l, what.as_ptr(), ar) }) != 0

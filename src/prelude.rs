@@ -34,5 +34,6 @@ pub use {
 	crate::Coroutine as LuaCoroutine,
 	crate::Thread as LuaThread,
 	crate::lua_fmt_error,
+	crate::lua_library,
 	crate::lua_push_fmt_string
 };

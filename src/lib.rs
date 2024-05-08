@@ -349,8 +349,8 @@ impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
 /// There are no flags, widths, or precisions.
 /// The conversion specifiers can only be:
 /// - `%%` - insert the character `%`.
-/// - `%s` - insert a zero-terminated string using [`*const c_char`](c_char),
-/// with no size restrictions.
+/// - `%s` - insert a zero-terminated string using
+/// [`*const c_char`](core::ffi::c_char), with no size restrictions.
 /// - `%f` - insert a [`Number`].
 /// - `%I` - insert an [`Integer`].
 /// - `%p` - insert a *thin* pointer, like [`*mut c_void`](c_void).
@@ -398,4 +398,54 @@ macro_rules! lua_fmt_error {
 			$(, $fmt_arg)*
 		)
 	}};
+}
+
+/// Create a [`Library`](crate::reg::Library) with a more understandable syntax.
+/// 
+/// The macro accepts a `struct` construction-like syntax, to construct an
+/// instance from a static array of pairs of [`CStr`] and
+/// [`Option<CFunction>`](CFunction), where a field with a value creates a pair
+/// `("name", Some(func_name))`, and a field with no value specified creates a
+/// pair `("name", None)`.
+/// 
+/// # Examples
+/// ```
+/// use lunka::prelude::*;
+/// 
+/// unsafe extern "C" fn l_get_pi(l: *mut LuaState) -> core::ffi::c_int {
+/// 	let lua: LuaThread = LuaThread::from_ptr(l);
+/// 	lua.push_number(3.14);
+/// 	1
+/// }
+/// 
+/// // This will create a `LuaLibrary` that, when used with `Thread::set_funcs`,
+/// // will set a table's field `get_pi` to the `l_get_pi` function, and `set_pi`
+/// // to `false`.
+/// let library = lua_library! {
+/// 	get_pi: l_get_pi,
+/// 	set_pi
+/// };
+/// ```
+#[cfg(feature = "auxlib")]
+#[macro_export]
+macro_rules! lua_library {
+	{$(
+		$field:ident $(: $fn_name:ident)?
+	),*} => {
+		$crate::reg::Library::new([
+			$(lua_library!(@field $field $($fn_name)?)),*
+		])
+	};
+
+	(@field $field:ident $fn_name:ident) => {
+		(unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(
+			concat!(stringify!($field), "\0").as_bytes()
+		) }, Some($fn_name))
+	};
+
+	(@field $field:ident) => {
+		(unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(
+			concat!(stringify!($field), "\0").as_bytes()
+		) }, None)
+	};
 }
