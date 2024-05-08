@@ -3,7 +3,7 @@ name = "lunka"
 description = "`#![no_std]` bindings to Lua 5.4"
 authors = [ "[aka]bomb" ]
 license = "MIT"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 repository = "https://github.com/b0mbie/lunka"
 
