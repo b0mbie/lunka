@@ -57,6 +57,10 @@ pub mod prelude {
 	pub use {
 		crate::auxlib::Reg as LuaReg,
 		crate::aux_options::AuxOptions as LuaAuxOptions,
+		crate::reg::Library as LuaLibrary
+	};
+
+	pub use {
 		crate::cdef::{
 			Alloc as LuaAlloc,
 			Arith as LuaArith,
@@ -78,7 +82,6 @@ pub mod prelude {
 			lua_upvalueindex as lua_upvalue_index
 		},
 		crate::dbg_what::DebugWhat as LuaDebugWhat,
-		crate::reg::Library as LuaLibrary,
 		crate::Lua,
 		crate::Coroutine as LuaCoroutine,
 		crate::Thread as LuaThread,
