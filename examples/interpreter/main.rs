@@ -90,7 +90,9 @@ unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
 
 	let run_status = lua.run_managed(|mut mg| {
 		mg.restart_gc();
-		mg.pcall(arg_count, 0, base)
+		let run_status = mg.pcall(arg_count, 0, base);
+		mg.stop_gc();
+		run_status
 	});
 	if !report(&mut lua, run_status) {
 		return 0

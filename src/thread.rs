@@ -133,12 +133,10 @@ impl Thread {
 	/// in a context.
 	#[inline(always)]
 	pub fn run_managed<R>(&mut self, func: impl FnOnce(Managed<'_>) -> R) -> R {
-		let result = func(Managed {
+		func(Managed {
 			l: self.l,
 			_life: PhantomData
-		});
-		self.stop_gc();
-		result
+		})
 	}
 
 	/// This is the same as [`Thread::run_managed`], however it doesn't borrow
