@@ -586,7 +586,9 @@ macro_rules! lua_state_func {
 }
 pub(crate) use lua_state_func;
 
-#[link(name = "lua54", kind = "raw-dylib")]
+#[cfg_attr(all(target_os = "windows", not(feature = "link-static")), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(not(target_os = "windows"), not(feature = "link-static")), link(name = "lua54", kind = "dylib"))]
+#[cfg_attr(feature = "link-static", link(name = "lua54", kind = "static"))]
 extern "C" {
 	pub fn lua_newstate(f: Alloc, ud: *mut c_void) -> *mut State;
 	pub fn lua_close(l: *mut State);

@@ -3,7 +3,7 @@ name = "lunka"
 description = "`#![no_std]` bindings to Lua 5.4"
 authors = [ "[aka]bomb" ]
 license = "MIT"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 repository = "https://github.com/b0mbie/lunka"
 
@@ -22,6 +22,9 @@ auxlib = []
 
 # Include and use definitions for importing the standard libraries (in `lualib.h`).
 stdlibs = []
+
+# Link `lua54` statically.
+link-static = []
 
 default = [ "auxlib", "stdlibs" ]
 
