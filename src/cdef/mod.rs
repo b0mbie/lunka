@@ -455,7 +455,7 @@ pub const DEFAULT_ID_SIZE: usize = 60;
 /// however that can always be changed, so a generic const is used here instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
-pub struct Debug<const ID_SIZE: usize> {
+pub struct Debug<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
 	pub event: c_int,
 	pub name: *const c_char,
 	pub name_what: *const c_char,
@@ -508,7 +508,7 @@ impl<const ID_SIZE: usize> Debug<ID_SIZE> {
 /// 
 /// The exact signature of this function depends on the size of
 /// `activation_record` behind a pointer - see [`struct@Debug`].
-pub type Hook<const ID_SIZE: usize> = unsafe extern "C" fn (
+pub type Hook<const ID_SIZE: usize = DEFAULT_ID_SIZE> = unsafe extern "C" fn (
 	l: *mut State, activation_record: *mut Debug<ID_SIZE>
 );
 

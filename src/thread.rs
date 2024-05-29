@@ -107,11 +107,11 @@ macro_rules! lua_is {
 /// [`Thread`] is guaranteed to have the same layout as a [`*mut State`](State).
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Thread<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
+pub struct Thread {
 	l: *mut State
 }
 
-impl<const ID_SIZE: usize> Thread<ID_SIZE> {
+impl Thread {
 	/// Construct a [`Thread`] from a raw C pointer to a Lua state.
 	/// 
 	/// # Safety
@@ -524,7 +524,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn new_thread<'l>(&'l self) -> Coroutine<'l, ID_SIZE> {
+	pub unsafe fn new_thread<'l>(&'l self) -> Coroutine<'l> {
 		Coroutine {
 			thread: unsafe { Thread::from_ptr(lua_newthread(self.l)) },
 			_life: PhantomData
@@ -1151,7 +1151,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// The value must be a thread; otherwise, the function returns `None`.
 	#[inline(always)]
-	pub fn to_thread<'l>(&'l self, index: c_int) -> Option<Coroutine<'l, ID_SIZE>> {
+	pub fn to_thread<'l>(&'l self, index: c_int) -> Option<Coroutine<'l>> {
 		let l_ptr = unsafe { lua_tothread(self.l, index) };
 		if !l_ptr.is_null() {
 			Some(Coroutine {
@@ -1302,8 +1302,11 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Return the current hook function.
 	/// 
 	/// See also [`Hook`].
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub fn hook(&self) -> Hook<ID_SIZE> {
+	pub unsafe fn hook<const ID_SIZE: usize>(&self) -> Hook<ID_SIZE> {
 		unsafe { lua_gethook(self.l) }
 	}
 
@@ -1324,8 +1327,13 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// Gets information about a specific function or function invocation.
 	/// 
 	/// See also [`DebugWhat`](crate::dbg_what::DebugWhat) for generating `what`.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub fn get_info(&self, what: &CStr, ar: &mut Debug<ID_SIZE>) -> bool {
+	pub unsafe fn get_info<const ID_SIZE: usize>(
+		&self, what: &CStr, ar: &mut Debug<ID_SIZE>
+	) -> bool {
 		(unsafe { lua_getinfo(self.l, what.as_ptr(), ar) }) != 0
 	}
 
@@ -1349,8 +1357,11 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// In this case, only parameters of Lua functions are visible (as there is
 	/// no information about what variables are active) and no values are pushed
 	/// onto the stack.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub fn get_local<'dbg>(
+	pub unsafe fn get_local<'dbg, const ID_SIZE: usize>(
 		&self,
 		ar: Option<&'dbg Debug<ID_SIZE>>, n: c_int
 	) -> Option<&'dbg CStr> {
@@ -1378,8 +1389,13 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// count in the stack).
 	/// When called with a level greater than the stack depth, this function
 	/// returns `None`.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub fn get_stack(&self, level: c_int) -> Option<Debug<ID_SIZE>> {
+	pub unsafe fn get_stack<const ID_SIZE: usize>(
+		&self, level: c_int
+	) -> Option<Debug<ID_SIZE>> {
 		let mut ar = Debug::zeroed();
 		if unsafe { lua_getstack(self.l, level, &mut ar) } != 0 {
 			Some(ar)
@@ -1430,8 +1446,13 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// This event only happens while Lua is executing a Lua function.
 	/// 
 	/// Hooks are disabled by supplying an empty `mask`.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub fn set_hook(&self, hook: Hook<ID_SIZE>, mask: HookMask, count: c_int) {
+	pub unsafe fn set_hook<const ID_SIZE: usize>(
+		&self, hook: Hook<ID_SIZE>, mask: HookMask, count: c_int
+	) {
 		unsafe { lua_sethook(self.l, hook, mask.into_c_int(), count) }
 	}
 
@@ -1443,8 +1464,11 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 	/// 
 	/// This function assigns the value on the top of the stack to the variable.
 	/// It also pops the value from the stack.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
 	#[inline(always)]
-	pub unsafe fn set_local<'dbg>(
+	pub unsafe fn set_local<'dbg, const ID_SIZE: usize>(
 		&self,
 		ar: &'dbg Debug<ID_SIZE>, n: c_int
 	) -> Option<&'dbg CStr> {
@@ -1499,7 +1523,7 @@ impl<const ID_SIZE: usize> Thread<ID_SIZE> {
 }
 
 #[cfg(feature = "auxlib")]
-impl<const ID_SIZE: usize> Thread<ID_SIZE> {
+impl Thread {
 	/// Construct a new [`Buffer`] that's initialized with this [`Thread`].
 	#[inline(always)]
 	pub fn new_buffer<'l>(&'l self) -> Buffer<'l> {

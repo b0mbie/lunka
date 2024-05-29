@@ -138,41 +138,40 @@ pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
 /// [`Lua`] is guaranteed to have the same layout as [`Thread`].
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Lua<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
-	thread: Thread<ID_SIZE>
+pub struct Lua {
+	thread: Thread
 }
 
-impl<const ID_SIZE: usize> Drop for Lua<ID_SIZE> {
+impl Drop for Lua {
 	fn drop(&mut self) {
 		unsafe { self.thread.close_as_main() }
 	}
 }
 
-impl<const ID_SIZE: usize> Deref for Lua<ID_SIZE> {
-	type Target = Thread<ID_SIZE>;
+impl Deref for Lua {
+	type Target = Thread;
 	fn deref(&self) -> &Self::Target {
 		&self.thread
 	}
 }
 
-impl<const ID_SIZE: usize> DerefMut for Lua<ID_SIZE> {
+impl DerefMut for Lua {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.thread
 	}
 }
 
 #[cfg(feature = "auxlib")]
-impl Lua<DEFAULT_ID_SIZE> {
-	/// Potentially construct a new [`Lua`] with the default `ID_SIZE` of
-	/// [`DEFAULT_ID_SIZE`], using the `lauxlib` function [`luaL_newstate`].
+impl Lua {
+	/// Potentially construct a new [`Lua`] using the `lauxlib` function
+	/// [`luaL_newstate`].
 	/// 
 	/// The function will return `None` if allocation failed.
 	pub fn new_auxlib() -> Option<Self> {
 		Self::new_auxlib_with()
 	}
 
-	/// Potentially Construct a new [`Lua`] with the default `ID_SIZE` of
-	/// [`DEFAULT_ID_SIZE`], using the [`Global`] Rust allocator.
+	/// Potentially construct a new [`Lua`] using the [`Global`] Rust allocator.
 	/// 
 	/// The function will return `None` if allocation failed.
 	pub fn new() -> Option<Self> {
@@ -180,7 +179,7 @@ impl Lua<DEFAULT_ID_SIZE> {
 	}
 }
 
-impl<const ID_SIZE: usize> Lua<ID_SIZE> {
+impl Lua {
 	#[inline(always)]
 	unsafe fn from_l(l: *mut State) -> Option<Self> {
 		if !l.is_null() {
@@ -290,7 +289,7 @@ impl<const ID_SIZE: usize> Lua<ID_SIZE> {
 	}
 }
 
-unsafe impl<const ID_SIZE: usize> Allocator for Lua<ID_SIZE> {
+unsafe impl Allocator for Lua {
 	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
 		let (alloc, ud) = self.get_alloc_fn();
 		let len = layout.size();
@@ -317,12 +316,12 @@ unsafe impl<const ID_SIZE: usize> Allocator for Lua<ID_SIZE> {
 /// [`Coroutine`] is guaranteed to have the same layout as [`Thread`].
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Coroutine<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {
-	thread: Thread<ID_SIZE>,
-	_life: PhantomData<&'l Lua<ID_SIZE>>
+pub struct Coroutine<'l> {
+	thread: Thread,
+	_life: PhantomData<&'l Lua>
 }
 
-impl<'l, const ID_SIZE: usize> Coroutine<'l, ID_SIZE> {
+impl<'l> Coroutine<'l> {
 	/// Alias to [`Thread::close_as_coroutine`].
 	pub fn close(&mut self) -> Status {
 		self.thread.close_as_coroutine()

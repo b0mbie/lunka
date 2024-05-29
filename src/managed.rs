@@ -21,25 +21,25 @@ use core::slice::from_raw_parts;
 /// collection.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Managed<'l, const ID_SIZE: usize = DEFAULT_ID_SIZE> {
+pub struct Managed<'l> {
     pub(crate) l: *mut State,
-    pub(crate) _life: PhantomData<&'l mut Thread<ID_SIZE>>
+    pub(crate) _life: PhantomData<&'l mut Thread>
 }
 
-impl<'l, const ID_SIZE: usize> Deref for Managed<'l, ID_SIZE> {
+impl<'l> Deref for Managed<'l> {
 	type Target = Thread;
 	fn deref(&self) -> &Self::Target {
 		unsafe { &*(self as *const _ as *const Self::Target) }
 	}
 }
 
-impl<'l, const ID_SIZE: usize> DerefMut for Managed<'l, ID_SIZE> {
+impl<'l> DerefMut for Managed<'l> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		unsafe { &mut *(self as *mut _ as *mut Self::Target) }
 	}
 }
 
-impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+impl<'l> Managed<'l> {
 	/// Perform an arithmetic or bitwise operation over two (or one) values at
 	/// the top of the stack, popping them, and push the result of the operation.
 	/// 
@@ -371,7 +371,7 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 }
 
 #[cfg(feature = "stdlibs")]
-impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+impl<'l> Managed<'l> {
 	/// Open all standard Lua libraries into the associated Lua thread.
 	/// 
 	/// # Safety
@@ -383,7 +383,7 @@ impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
 }
 
 #[cfg(feature = "auxlib")]
-impl<'l, const ID_SIZE: usize> Managed<'l, ID_SIZE> {
+impl<'l> Managed<'l> {
 	/// Call a metamethod `event` on the object at index `obj_index`.
 	/// 
 	/// If the object at index `obj_index` has a metatable and this metatable
