@@ -61,9 +61,9 @@ pub const NO_REF: c_int = -2;
 /// Constant that indicates a reference to `nil`.
 pub const REF_NIL: c_int = -1;
 
-#[cfg_attr(all(target_os = "windows", not(feature = "link-static")), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(not(target_os = "windows"), not(feature = "link-static")), link(name = "lua54", kind = "dylib"))]
-#[cfg_attr(feature = "link-static", link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(not(feature = "link-manually"), target_os = "windows", not(feature = "link-static")), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(not(feature = "link-manually"), not(target_os = "windows"), not(feature = "link-static")), link(name = "lua54", kind = "dylib"))]
+#[cfg_attr(all(not(feature = "link-manually"), feature = "link-static"), link(name = "lua54", kind = "static"))]
 extern "C" {
 	pub fn luaL_newstate() -> *mut State;
 
