@@ -161,24 +161,6 @@ impl DerefMut for Lua {
 	}
 }
 
-#[cfg(feature = "auxlib")]
-impl Lua {
-	/// Potentially construct a new [`Lua`] using the `lauxlib` function
-	/// [`luaL_newstate`].
-	/// 
-	/// The function will return `None` if allocation failed.
-	pub fn new_auxlib() -> Option<Self> {
-		Self::new_auxlib_with()
-	}
-
-	/// Potentially construct a new [`Lua`] using the [`Global`] Rust allocator.
-	/// 
-	/// The function will return `None` if allocation failed.
-	pub fn new() -> Option<Self> {
-		Self::new_with()
-	}
-}
-
 impl Lua {
 	#[inline(always)]
 	unsafe fn from_l(l: *mut State) -> Option<Self> {
@@ -193,12 +175,13 @@ impl Lua {
 		}
 	}
 
-	/// Construct a new [`Lua`] using the `lauxlib` function [`luaL_newstate`].
+	/// Potentially construct a new [`Lua`] using the `lauxlib` function
+	/// [`luaL_newstate`].
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "auxlib")]
 	#[inline(always)]
-	pub fn new_auxlib_with() -> Option<Self> {
+	pub fn new_auxlib() -> Option<Self> {
 		unsafe { Self::from_l(luaL_newstate()) }
 	}
 
@@ -212,11 +195,10 @@ impl Lua {
 		unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
-	/// Construct a new [`Lua`] using the [`Global`] Rust allocator.
+	/// Potentially construct a new [`Lua`] using the [`Global`] Rust allocator.
 	/// 
 	/// The function will return `None` if allocation failed.
-	#[inline(always)]
-	pub fn new_with() -> Option<Self> {
+	pub fn new() -> Option<Self> {
 		// TODO: Is this right for emulating `malloc`?
 		unsafe extern "C" fn l_alloc(
 			_ud: *mut c_void,
