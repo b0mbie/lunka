@@ -1994,8 +1994,9 @@ impl Thread {
 	/// 
 	/// See also [`Library`].
 	/// 
-	// /// A function with a NULL value represents a placeholder, which is
-	// /// filled with `false`.
+	/// A value with a `None` value represents a placeholder, which is filled
+	/// with `false`.
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
@@ -2006,7 +2007,7 @@ impl Thread {
 	}
 
 	/// Set the metatable of the object on the top of the stack as the metatable
-	/// associated with name `table_name` in the registry
+	/// associated with name `table_name` in the registry.
 	/// 
 	/// See also [`Thread::new_metatable`].
 	#[inline(always)]
@@ -2030,7 +2031,7 @@ impl Thread {
 
 	/// Create and push a traceback of the stack of thread `of`.
 	/// 
-	/// If message os `Some`, it is appended at the beginning of the traceback.
+	/// If message is `Some`, it is appended at the beginning of the traceback.
 	/// 
 	/// `level` tells at which level to start the traceback.
 	/// 
@@ -2067,7 +2068,7 @@ impl Thread {
 
 	/// Release the reference `ref_idx` from the table at index `store_index`.
 	/// 
-	/// If `ref_idx` is LUA_NOREF or LUA_REFNIL, luaL_unref does nothing.
+	/// If `ref_idx` is [`NO_REF`] or [`REF_NIL`], this function does nothing.
 	/// 
 	/// The entry is removed from the table, so that the referred object can be
 	/// collected.
