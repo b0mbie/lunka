@@ -1020,7 +1020,7 @@ impl Thread {
 	/// below an active to-be-closed slot.
 	/// 
 	/// Note that, both in case of errors and of a regular return, by the time
-	/// the __close metamethod runs, the C stack was already unwound, so that
+	/// the `__close` metamethod runs, the C stack was already unwound, so that
 	/// any automatic C variable declared in the calling function
 	/// (e.g., a buffer) will be out of scope.
 	#[inline(always)]
