@@ -39,9 +39,9 @@ pub const PACKAGE_LIB_NAME: &'static CStr = unsafe {
 	CStr::from_bytes_with_nul_unchecked(b"package\0")
 };
 
-#[cfg_attr(all(not(feature = "link-manually"), target_os = "windows", not(feature = "link-static")), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(not(feature = "link-manually"), not(target_os = "windows"), not(feature = "link-static")), link(name = "lua54", kind = "dylib"))]
-#[cfg_attr(all(not(feature = "link-manually"), feature = "link-static"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua54", kind = "dylib"))]
+#[cfg_attr(all(feature = "link-lua54", feature = "link-static"), link(name = "lua54", kind = "static"))]
 extern "C" {
 	lua_state_func! {
 		pub fn luaopen_base(self) -> c_int;
