@@ -12,6 +12,13 @@ keywords = ["lua"]
 [[example]]
 name = "interpreter"
 
+[[example]]
+name = "push-trait"
+
+[[example]]
+name = "os2"
+crate-type = ["cdylib"]
+
 [features]
 # Use definitions for 32 bits max.
 # This is analogous to the `LUA_32BITS` define, and should be set appropriately
