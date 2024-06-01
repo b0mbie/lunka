@@ -142,6 +142,10 @@ pub struct Lua {
 	thread: Thread
 }
 
+// SAFETY: `Lua` owns its Lua state, and will manage it.
+// You also cannot clone a `Lua`.
+unsafe impl Send for Lua {}
+
 impl Drop for Lua {
 	fn drop(&mut self) {
 		unsafe { self.thread.close_as_main() }
@@ -255,6 +259,10 @@ impl Lua {
 	/// 
 	/// # Safety
 	/// `l` must be a valid pointer to a Lua state.
+	/// 
+	/// With this function, the [`Lua`] takes ownership of the Lua state.
+	/// You may not, for example, pass a coroutine pointer to this, as the
+	/// coroutine will not be owned by Rust code.
 	#[inline(always)]
 	pub unsafe fn from_ptr(l: *mut State) -> Self {
 		let thread = Thread::from_ptr(l);
