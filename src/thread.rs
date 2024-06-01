@@ -213,6 +213,14 @@ impl Thread {
 		unsafe { lua_error(self.l) }
 	}
 
+	/// Restart the garbage collector.
+	/// 
+	/// This by itself does not run a collection.
+	#[inline(always)]
+	pub fn restart_gc(&self) {
+		unsafe { lua_gc(self.l, GcTask::Restart as _) };
+	}
+
 	/// Stop the garbage collector.
 	#[inline(always)]
 	pub fn stop_gc(&self) {

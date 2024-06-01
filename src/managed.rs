@@ -166,12 +166,6 @@ impl<'l> Managed<'l> {
 		unsafe { lua_concat(self.l, n as _) }
 	}
 
-	/// Restart the garbage collector.
-	#[inline(always)]
-	pub fn restart_gc(&mut self) {
-		unsafe { lua_gc(self.l, GcTask::Restart as _) };
-	}
-
 	/// Perform a full garbage collection cycle.
 	#[inline(always)]
 	pub fn run_gc(&mut self) {
