@@ -1965,33 +1965,6 @@ impl Thread {
 		unsafe { luaL_ref(self.l, store_index) }
 	}
 
-	/// If `package.loaded[modname]` is not true, calls the function `open_fn`
-	/// with the string `module_name` as an argument and sets the call result to
-	/// `package.loaded[modname]`, as if that function has been called through
-	/// `require`.
-	/// 
-	/// This function leaves a copy of the module on the stack. 
-	/// 
-	/// If `into_global` is true, also stores the module into the global
-	/// `module_name`.
-	/// 
-	/// # Safety
-	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	#[inline(always)]
-	pub unsafe fn require(
-		&self,
-		module_name: &CStr,
-		open_fn: CFunction,
-		into_global: bool
-	) {
-		unsafe { luaL_requiref(
-			self.l,
-			module_name.as_ptr(),
-			open_fn,
-			if into_global { 1 } else { 0 }
-		) }
-	}
-
 	/// Registers all functions in the list `library` into the table on the top
 	/// of the stack (below optional upvalues).
 	/// 
