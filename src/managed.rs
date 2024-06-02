@@ -491,7 +491,9 @@ impl<'l> Managed<'l> {
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_chars_meta(&'l mut self, index: c_int) -> Option<&'l [c_char]> {
+	pub unsafe fn to_chars_meta<'a>(
+		&'a mut self, index: c_int
+	) -> Option<&'a [c_char]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
@@ -507,7 +509,9 @@ impl<'l> Managed<'l> {
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_byte_str_meta(&'l mut self, index: c_int) -> Option<&'l [u8]> {
+	pub unsafe fn to_byte_str_meta<'a>(
+		&'a mut self, index: c_int
+	) -> Option<&'a [u8]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
