@@ -418,17 +418,17 @@ macro_rules! lua_fmt_error {
 #[macro_export]
 macro_rules! lua_library {
 	{$(
-		$field:ident $(: $fn_name:ident)?
+		$field:ident $(: $fn:expr)?
 	),*} => {
 		$crate::reg::Library::new([
-			$(lua_library!(@field $field $($fn_name)?)),*
+			$(lua_library!(@field $field $($fn)?)),*
 		])
 	};
 
-	(@field $field:ident $fn_name:ident) => {
+	(@field $field:ident $fn:expr) => {
 		(unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(
 			concat!(stringify!($field), "\0").as_bytes()
-		) }, Some($fn_name))
+		) }, Some($fn))
 	};
 
 	(@field $field:ident) => {
