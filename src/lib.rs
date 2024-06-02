@@ -142,10 +142,6 @@ pub struct Lua {
 	thread: Thread
 }
 
-// SAFETY: `Lua` owns its Lua state, and will manage it.
-// You also cannot clone a `Lua`.
-unsafe impl Send for Lua {}
-
 impl Drop for Lua {
 	fn drop(&mut self) {
 		unsafe { self.thread.close_as_main() }
