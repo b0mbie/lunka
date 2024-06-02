@@ -136,6 +136,67 @@ pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
 /// 
 /// # Layout
 /// [`Lua`] is guaranteed to have the same layout as [`Thread`].
+/// 
+/// # Thread safety
+/// [`Lua`] isn't [`Send`] nor [`Sync`] because of [`Thread`], which doesn't
+/// implement any of those traits either.
+/// Though, this structure *owns* its Lua thread, so, at first glance, it should
+/// implement [`Send`], but implementing this marker trait is not valid.
+/// 
+/// Due to the unique nature of most [`Thread`] methods which take a `&self`
+/// instead of a `&mut self`, a `Lua` *could've* been put into an `Arc<Lua>`,
+/// and then internally mutated through the `&self` methods if it implemented
+/// [`Send`].
+/// 
+/// # Examples
+/// The Lua headers define there to be the macros `lua_lock` and `lua_unlock`.
+/// These macros are intended to be used during compilation to synchronize
+/// operations on a Lua state, possibly with a mutex.
+/// The default definitions for these macros, however, are no-ops and will not
+/// ensure any thread safety by default.
+/// If you are *sure* that the Lua API you're linking against has been compiled
+/// with meaningful `lua_lock` and `lua_unlock`, then you can wrap a `Lua` in
+/// another type and implement [`Send`] and [`Sync`] for it, as well as
+/// [`Deref`] and [`DerefMut`] for ergonomics:
+/// ```no_run
+/// use core::ops::{ Deref, DerefMut };
+/// use lunka::Lua;
+/// 
+/// #[repr(transparent)]
+/// pub struct MtLua {
+/// 	lua: Lua,
+/// }
+/// 
+/// impl Deref for MtLua {
+/// 	type Target = Lua;
+/// 	fn deref(&self) -> &Self::Target {
+/// 		&self.lua
+/// 	}
+/// }
+/// 
+/// impl DerefMut for MtLua {
+/// 	fn deref_mut(&mut self) -> &mut Self::Target {
+/// 		&mut self.lua
+/// 	}
+/// }
+/// 
+/// // SAFETY: The Lua API we're linking against was compiled with
+/// // synchronization for mutable operations.
+/// unsafe impl Send for MtLua {}
+/// unsafe impl Sync for MtLua {}
+/// 
+/// impl MtLua {
+/// 	pub fn new() -> Option<Self> {
+/// 		let lua = Lua::new()?;
+/// 		Self {
+/// 			lua
+/// 		}
+/// 	}
+/// }
+/// 
+/// let lua = MtLua::new();
+/// assert_eq!(lua.version(), lunka::cdef::VERSION_NUM);
+/// ```
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Lua {
