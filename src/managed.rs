@@ -70,7 +70,7 @@ impl<'l> Managed<'l> {
 	/// 
 	/// When the function returns, all arguments and the function value are
 	/// popped and the call results are pushed onto the stack.
-	/// The number of results is adjusted to `n_results`, unless nresults is
+	/// The number of results is adjusted to `n_results`, unless it is
 	/// [`MULT_RET`]. In this case, all results from the function are pushed;
 	/// Lua takes care that the returned values fit into the stack space, but it
 	/// does not ensure any extra space in the stack.
