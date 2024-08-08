@@ -87,9 +87,6 @@ macro_rules! lua_is {
 /// pointers that the C API returns, though they are converted to references for
 /// the Rust borrow checker to ensure safety.
 /// The Lua garbage collector will not invalidate any pointers if it is stopped.
-/// [`Lua`](crate::Lua) will usually force the garbage collector to stay off
-/// with an API call if the code has declared that some pointers must not be
-/// invalidated.
 /// 
 /// To call API functions that can potentially enable the GC, it is required
 /// that any references that have been acquired previously from a [`Thread`] are
