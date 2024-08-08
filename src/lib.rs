@@ -229,7 +229,6 @@ impl Lua {
 			let lua = Self {
 				thread: unsafe { Thread::from_ptr(l) }
 			};
-			lua.stop_gc();
 			Some(lua)
 		} else {
 			None
