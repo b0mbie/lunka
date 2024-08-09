@@ -29,15 +29,18 @@ use core::ptr::{
 pub mod errors {}
 
 #[cfg(feature = "auxlib")]
-pub mod aux_options;
+mod aux_options;
+pub use aux_options::*;
 pub mod cdef;
-pub mod dbg_what;
-pub mod managed;
+mod dbg_what;
+pub use dbg_what::*;
+mod managed;
 pub use managed::*;
 pub mod prelude;
 #[cfg(feature = "auxlib")]
-pub mod reg;
-pub mod thread;
+mod reg;
+pub use reg::*;
+mod thread;
 pub use thread::*;
 
 use cdef::*;
@@ -477,7 +480,7 @@ macro_rules! lua_library {
 	{$(
 		$field:ident $(: $fn:expr)?
 	),*} => {
-		$crate::reg::Library::new([
+		$crate::Library::new([
 			$(lua_library!(@field $field $($fn)?)),*
 		])
 	};
