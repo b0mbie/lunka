@@ -24,7 +24,8 @@ use core::ptr::{
 };
 
 #[cfg(any(doc, doctest))]
-#[cfg_attr(any(doc, doctest), doc = include_str!("../doc/errors.md"))]
+#[allow(rustdoc::redundant_explicit_links)]
+#[doc = include_str!("../doc/errors.md")]
 pub mod errors {}
 
 #[cfg(feature = "auxlib")]
