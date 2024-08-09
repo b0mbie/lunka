@@ -10,10 +10,17 @@ documentation = "https://docs.rs/lunka"
 keywords = ["lua"]
 
 [[example]]
+name = "hello"
+
+[[example]]
+name = "hello_lib"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "interpreter"
 
 [[example]]
-name = "push-trait"
+name = "push_trait"
 
 [[example]]
 name = "os2"

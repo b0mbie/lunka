@@ -1,14 +1,3 @@
-# lunka
-Pretty thin bindings to Lua 5.4.
-
-This crate is still a work-in-progress, but is usable for projects.
-
-Please check the latest documentation here:
-[Documentation on `docs.rs`](https://docs.rs/lunka/).
-
-# Examples
-Creating a Lua "C" library:
-```rust
 use core::ffi::c_int;
 use lunka::prelude::*;
 
@@ -40,7 +29,3 @@ unsafe extern "C" fn luaopen_hello(l: *mut LuaState) -> c_int {
 
 	1
 }
-```
-
-For some more examples, check the `examples` directory in the crate's repository.
-They are comprehensive enough for actual usage.
