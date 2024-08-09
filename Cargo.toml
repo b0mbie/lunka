@@ -20,6 +20,9 @@ name = "os2"
 crate-type = ["cdylib"]
 
 [features]
+# Use Rust's `alloc` crate.
+alloc = []
+
 # Use definitions for 32 bits max.
 # This is analogous to the `LUA_32BITS` define, and should be set appropriately
 # depending on the compiled Lua settings.
@@ -44,9 +47,4 @@ link-lua54 = []
 # executable.
 link-static = ["link-lua54"]
 
-default = ["auxlib", "stdlibs", "link-lua54"]
-
-[dependencies.allocator-api2]
-version = "0.2.16"
-default-features = false
-features = ["alloc"]
+default = ["alloc", "auxlib", "stdlibs", "link-lua54"]

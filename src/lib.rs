@@ -7,20 +7,17 @@
 // - Uservalue indices are presented as `int`s, however Lua uses them in
 // `unsigned short`s.
 
-use allocator_api2::alloc::{
-	AllocError, Allocator, Global
-};
-use core::alloc::Layout;
-use core::ffi::{
-	c_int, c_void, CStr
-};
-use core::marker::PhantomData;
-use core::mem::align_of;
-use core::ops::{
-	Deref, DerefMut
-};
-use core::ptr::{
-	null_mut, NonNull
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+use core::{
+	ffi::{
+		c_int, c_void, CStr
+	},
+	marker::PhantomData,
+	ops::{
+		Deref, DerefMut
+	},
 };
 
 #[cfg(any(doc, doctest))]
@@ -261,33 +258,59 @@ impl Lua {
 		unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
-	/// Potentially construct a new [`Lua`] using the [`Global`] Rust allocator.
+	/// Potentially construct a new [`Lua`] using the global Rust allocator.
 	/// 
 	/// The function will return `None` if allocation failed.
+	#[cfg(feature = "alloc")]
 	pub fn new() -> Option<Self> {
+		use alloc::alloc::{
+			Layout,
+			alloc,
+			realloc,
+			dealloc,
+		};
+		use core::{
+			mem::align_of,
+			ptr::null_mut,
+		};
+
+		const fn guess_layout(size: usize) -> Layout {
+			match size & (core::mem::size_of::<usize>() - 1) {
+				0 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<usize>()
+				) },
+				1 | 3 | 5 | 7 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<u8>()
+				) },
+				2 | 6 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<u16>()
+				) },
+				4 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<u32>()
+				) },
+				_ => panic!("unsupported platform with `usize` of >8 bytes")
+			}
+		}
+
 		// TODO: Is this right for emulating `malloc`?
 		unsafe extern "C" fn l_alloc(
 			_ud: *mut c_void,
 			ptr: *mut c_void, osize: usize,
 			nsize: usize
 		) -> *mut c_void {
-			if let Some(alloc_ptr) = NonNull::new(ptr as *mut u8) {
+			let ptr = ptr as *mut u8;
+			if !ptr.is_null() {
 				if nsize <= 0 {
-					Global.deallocate(
-						alloc_ptr,
-						Layout::from_size_align_unchecked(
-							osize, align_of::<usize>()
-						)
-					);
+					// FIXME: Once `allocator_api` is stabilized, use
+					// `Global.deallocate`.
+					dealloc(ptr, guess_layout(osize));
 					null_mut()
 				} else {
-					let old_layout = Layout::from_size_align_unchecked(
-						osize, align_of::<usize>()
-					);
-					let new_layout = Layout::from_size_align_unchecked(
-						nsize, align_of::<usize>()
-					);
-	
+					let old_layout = guess_layout(osize);
+
+					// FIXME: Once `allocator_api` is stabilized, use this.
+					/*
+					let new_layout = guess_layout(nsize);
 					if nsize > osize {
 						Global.grow(alloc_ptr, old_layout, new_layout)
 							.map(|mut ptr| {
@@ -303,13 +326,17 @@ impl Lua {
 					} else {
 						ptr
 					}
+					*/
+					realloc(ptr, old_layout, nsize) as *mut c_void
 				}
 			} else {
-				Global.allocate(Layout::from_size_align_unchecked(
-					nsize, align_of::<usize>()
-				))
+				alloc(guess_layout(nsize)) as *mut c_void
+				// FIXME: Once `allocator_api` is stabilized, use this.
+				/*
+				Global.allocate(guess_layout(nsize))
 					.map(|ptr| (*ptr.as_ptr()).as_mut_ptr() as *mut c_void)
 					.unwrap_or(null_mut())
+				*/
 			}
 		}
 
@@ -338,21 +365,6 @@ impl Lua {
 	#[inline(always)]
 	pub const fn as_ptr(&self) -> *mut State {
 		self.thread.as_ptr()
-	}
-}
-
-unsafe impl Allocator for Lua {
-	fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-		let (alloc, ud) = self.get_alloc_fn();
-		let len = layout.size();
-		NonNull::new(unsafe { alloc(ud, null_mut(), 0, len) } as *mut u8)
-			.map(|ptr| NonNull::slice_from_raw_parts(ptr, len))
-			.ok_or(AllocError)
-	}
-
-	unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-		let (alloc, ud) = self.get_alloc_fn();
-		unsafe { alloc(ud, ptr.as_ptr() as *mut c_void, layout.size(), 0) };
 	}
 }
 
