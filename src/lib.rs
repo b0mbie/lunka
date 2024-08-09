@@ -30,6 +30,7 @@ pub mod errors {}
 
 #[cfg(feature = "auxlib")]
 mod aux_options;
+#[cfg(feature = "auxlib")]
 pub use aux_options::*;
 pub mod cdef;
 mod dbg_what;
@@ -39,6 +40,7 @@ pub use managed::*;
 pub mod prelude;
 #[cfg(feature = "auxlib")]
 mod reg;
+#[cfg(feature = "auxlib")]
 pub use reg::*;
 mod thread;
 pub use thread::*;
