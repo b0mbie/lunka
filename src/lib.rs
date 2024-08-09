@@ -274,8 +274,11 @@ impl Lua {
 			ptr::null_mut,
 		};
 
+		#[cfg(target_pointer_width = "64")]
 		const fn guess_layout(size: usize) -> Layout {
-			match size & (core::mem::size_of::<usize>() - 1) {
+			const MASK: usize = core::mem::size_of::<usize>() - 1;
+			const { assert!(MASK == 7, "invalid mask") };
+			match size & MASK {
 				0 => unsafe { Layout::from_size_align_unchecked(
 					size, align_of::<usize>()
 				) },
@@ -288,8 +291,31 @@ impl Lua {
 				4 => unsafe { Layout::from_size_align_unchecked(
 					size, align_of::<u32>()
 				) },
-				_ => panic!("unsupported platform with `usize` of >8 bytes")
+				// SAFETY: The mask is in the range `0..=7`.
+				_ => unsafe { core::hint::unreachable_unchecked() }
 			}
+		}
+		#[cfg(target_pointer_width = "32")]
+		const fn guess_layout(size: usize) -> Layout {
+			const MASK: usize = core::mem::size_of::<usize>() - 1;
+			const { assert!(MASK == 3, "invalid mask") };
+			match size & MASK {
+				0 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<usize>()
+				) },
+				1 | 3 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<u8>()
+				) },
+				2 => unsafe { Layout::from_size_align_unchecked(
+					size, align_of::<u16>()
+				) },
+				// SAFETY: The mask is in the range `0..=3`.
+				_ => unsafe { core::hint::unreachable_unchecked() }
+			}
+		}
+		#[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
+		const fn guess_layout(size: usize) -> Layout {
+			compile_error!("unsupported `usize` for platform")
 		}
 
 		// TODO: Is this right for emulating `malloc`?
