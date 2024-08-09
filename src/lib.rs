@@ -188,13 +188,13 @@ pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
 /// impl MtLua {
 /// 	pub fn new() -> Option<Self> {
 /// 		let lua = Lua::new()?;
-/// 		Self {
+/// 		Some(Self {
 /// 			lua
-/// 		}
+/// 		})
 /// 	}
 /// }
 /// 
-/// let lua = MtLua::new();
+/// let lua = MtLua::new().unwrap();
 /// assert_eq!(lua.version(), lunka::cdef::VERSION_NUM);
 /// ```
 #[derive(Debug)]
