@@ -62,8 +62,9 @@ pub const NO_REF: c_int = -2;
 pub const REF_NIL: c_int = -1;
 
 #[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua54", kind = "dylib"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
+#[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
 extern "C" {
 	pub fn luaL_newstate() -> *mut State;
 

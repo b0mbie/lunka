@@ -32,13 +32,14 @@ auxlib = []
 # Include and use definitions for importing the standard libraries (in `lualib.h`).
 stdlibs = []
 
-# Include attributes to link to `lua54`, using `raw-dylib` on Windows and `dylib`
-# otherwise.
+# Include attributes to link to `lua54` using `raw-dylib` on Windows, and
+# `lua5.4` using `dylib` otherwise.
 # You may disable this if, for example, you have your own `build.rs` script that
 # links Lua in a different way.
 link-lua54 = []
 
-# Link `lua54` statically.
+# Link statically the library `lua54` on Windows, and `lua5.4` on other
+# platforms.
 # This may be useful for applications, since Lua will become embedded in the
 # executable.
 link-static = ["link-lua54"]
