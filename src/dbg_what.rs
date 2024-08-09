@@ -2,7 +2,11 @@
 
 use core::ffi::c_char;
 
-/// Helper structure for [`lua_getinfo`](crate::cdef::lua_getinfo).
+/// Structure for defining what information needs to be extracted from a
+/// function.
+/// 
+/// This is used in [`lua_getinfo`](crate::cdef::lua_getinfo) and
+/// [`Thread::get_info`](crate::thread::Thread::get_info).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DebugWhat {
 	what_flags: u8,

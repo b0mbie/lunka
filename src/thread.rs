@@ -14,16 +14,18 @@ use crate::{
 	reg::*
 };
 
-use core::ffi::{
-	c_char, c_int, c_uint, c_ushort, c_void, CStr
-};
-use core::marker::PhantomData;
-use core::mem::size_of;
-use core::ptr::{
-	null, null_mut, write, NonNull
-};
-use core::slice::{
-	from_raw_parts, from_raw_parts_mut
+use core::{
+	ffi::{
+		c_char, c_int, c_uint, c_ushort, c_void, CStr
+	},
+	marker::PhantomData,
+	mem::size_of,
+	ptr::{
+		null, null_mut, write, NonNull
+	},
+	slice::{
+		from_raw_parts, from_raw_parts_mut
+	},
 };
 
 macro_rules! lua_is {

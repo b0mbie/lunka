@@ -1,18 +1,23 @@
 //! See [`AuxOptions`].
 
-use core::ffi::{
-	CStr,
-	c_char
+use core::{
+	ffi::{
+		CStr,
+		c_char
+	},
+	marker::PhantomData,
+	mem::{
+		transmute, MaybeUninit
+	},
+	ptr::null,
+	slice::from_raw_parts,
 };
-use core::marker::PhantomData;
-use core::mem::{
-	transmute, MaybeUninit
-};
-use core::ptr::null;
-use core::slice::from_raw_parts;
 
 /// List of string options to be used with
 /// [`Thread::check_option`](crate::Thread::check_option).
+/// 
+/// The generic `const N: usize` specifies the static number of entries;
+/// `'str` indicates the lifetime for every entry, which are C strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct AuxOptions<'str, const N: usize> {

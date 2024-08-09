@@ -8,17 +8,22 @@ use crate::{
 #[cfg(feature = "auxlib")]
 use crate::auxlib::*;
 
-use core::ffi::{
-	c_char, c_int, c_uint, CStr
+use core::{
+	ffi::{
+		c_char, c_int, c_uint, CStr
+	},
+	marker::PhantomData,
+	ops::{
+		Deref, DerefMut
+	},
+	slice::from_raw_parts,
 };
-use core::marker::PhantomData;
-use core::ops::{
-	Deref, DerefMut
-};
-use core::slice::from_raw_parts;
 
 /// Context for invalidating pointers that may be freed during garbage
 /// collection.
+/// 
+/// This structure is available in callbacks provided by [`Thread::run_managed`]
+/// and [`Thread::run_managed_no_gc`].
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Managed<'l> {

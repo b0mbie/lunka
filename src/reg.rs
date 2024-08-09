@@ -3,16 +3,21 @@
 use crate::auxlib::Reg;
 use crate::cdef::CFunction;
 
-use core::ffi::CStr;
-use core::marker::PhantomData;
-use core::mem::{
-	transmute, MaybeUninit
+use core::{
+	ffi::CStr,
+	marker::PhantomData,
+	mem::{
+		transmute, MaybeUninit
+	},
+	ptr::null,
+	slice::from_raw_parts,
 };
-use core::ptr::null;
-use core::slice::from_raw_parts;
 
 /// List of registered C functions to be used with
 /// [`Thread::new_lib`](crate::Thread::new_lib).
+/// 
+/// The generic `const N: usize` specifies the static number of entries;
+/// `'name` indicates the lifetime for every key, which are C strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct Library<'name, const N: usize> {

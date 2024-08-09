@@ -18,18 +18,20 @@
 //! - do not use locks even with RAII guards, because they suffer from the same
 //! problem as non-Lua allocations.
 
-use core::ffi::{
-	c_char,
-	c_int,
-	c_uchar,
-	c_uint,
-	c_ushort,
-	c_void
-};
-use core::mem::transmute;
-use core::ptr::{
-	null_mut,
-	null
+use core::{
+	ffi::{
+		c_char,
+		c_int,
+		c_uchar,
+		c_uint,
+		c_ushort,
+		c_void
+	},
+	mem::transmute,
+	ptr::{
+		null_mut,
+		null,
+	},
 };
 
 #[cfg(feature = "auxlib")]
@@ -96,9 +98,11 @@ mod dependent {
 		pub type Number = c_double;
 	}
 
-	pub use on_32_bits::Integer;
-	pub use on_32_bits::Unsigned;
-	pub use on_32_bits::Number;
+	pub use on_32_bits::{
+		Integer,
+		Unsigned,
+		Number,
+	};
 }
 
 /// Type of signed Lua integers.

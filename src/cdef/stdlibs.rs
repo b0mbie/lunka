@@ -1,6 +1,7 @@
 //! FFI definitions for `lualib.h`.
 
 use super::*;
+
 use core::ffi::CStr;
 
 pub const COROUTINE_LIB_NAME: &'static CStr = unsafe {

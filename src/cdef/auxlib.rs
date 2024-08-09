@@ -3,17 +3,20 @@
 #![allow(non_snake_case)]
 
 use super::*;
-use core::ffi::CStr;
-use core::fmt::Write;
-use core::marker::PhantomData;
-use core::mem::{
-	MaybeUninit,
-	size_of
+
+use core::{
+	ffi::CStr,
+	fmt::Write,
+	marker::PhantomData,
+	mem::{
+		MaybeUninit,
+		size_of
+	},
+	ptr::{
+		null, null_mut
+	},
+	slice::from_raw_parts_mut,
 };
-use core::ptr::{
-	null, null_mut
-};
-use core::slice::from_raw_parts_mut;
 
 /// Global table name.
 /// 
