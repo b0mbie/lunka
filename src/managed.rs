@@ -34,13 +34,13 @@ pub struct Managed<'l> {
 impl<'l> Deref for Managed<'l> {
 	type Target = Thread;
 	fn deref(&self) -> &Self::Target {
-		unsafe { &*(self as *const _ as *const Self::Target) }
+		unsafe { Thread::from_ptr(self.l) }
 	}
 }
 
 impl<'l> DerefMut for Managed<'l> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		unsafe { &mut *(self as *mut _ as *mut Self::Target) }
+		unsafe { Thread::from_ptr(self.l) }
 	}
 }
 

@@ -14,7 +14,6 @@ use core::{
 	ffi::{
 		c_int, c_void, CStr
 	},
-	marker::PhantomData,
 	ops::{
 		Deref, DerefMut
 	},
@@ -203,7 +202,7 @@ pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Lua {
-	thread: Thread
+	thread: &'static mut Thread,
 }
 
 impl Drop for Lua {
@@ -389,7 +388,7 @@ impl Lua {
 
 	/// Return the raw pointer to the underlying Lua state.
 	#[inline(always)]
-	pub const fn as_ptr(&self) -> *mut State {
+	pub fn as_ptr(&self) -> *mut State {
 		self.thread.as_ptr()
 	}
 }
@@ -407,8 +406,20 @@ impl Lua {
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Coroutine<'l> {
-	thread: Thread,
-	_life: PhantomData<&'l Lua>
+	thread: &'l mut Thread,
+}
+
+impl<'l> Deref for Coroutine<'l> {
+	type Target = Thread;
+	fn deref(&self) -> &Self::Target {
+		self.thread
+	}
+}
+
+impl<'l> DerefMut for Coroutine<'l> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		self.thread
+	}
 }
 
 impl<'l> Coroutine<'l> {

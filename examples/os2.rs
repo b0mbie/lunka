@@ -19,7 +19,7 @@ macro_rules! c_str {
 }
 
 unsafe extern "C" fn l_metadata(l: *mut LuaState) -> c_int {	
-	let mut lua = LuaThread::from_ptr(l);
+	let lua = LuaThread::from_ptr(l);
 	let path = lua.check_byte_str(1);
 	
 	let meta = match metadata(String::from_utf8_lossy(path).into_owned()) {
