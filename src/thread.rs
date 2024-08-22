@@ -934,7 +934,7 @@ impl Thread {
 	/// Return the status of the Lua thread represented by this [`Thread`].
 	/// 
 	/// The status can be [`Status::Ok`] for a normal thread, an error variant
-	/// if the thread finished the execution of a [`Thread::resume`] with an
+	/// if the thread finished the execution of a [`Managed::resume`] with an
 	/// error, or [`Status::Yielded`] if the thread is suspended.
 	/// 
 	/// Functions can only be called in threads with status [`Status::Ok`].
@@ -1197,18 +1197,18 @@ impl Thread {
 	/// Yield this thread (like a coroutine).
 	/// 
 	/// When this function is called, the running coroutine suspends its
-	/// execution, and the call to [`Thread::resume`] that started this
+	/// execution, and the call to [`Managed::resume`] that started this
 	/// coroutine returns.
 	/// 
 	/// The parameter `n_results` is the number of values from the stack that
-	/// will be passed as results to [`Thread::resume`].
+	/// will be passed as results to [`Managed::resume`].
 	/// 
 	/// When the coroutine is resumed again, Lua calls the given continuation
 	/// function `continuation` to continue the execution of the C function that
 	/// yielded.
 	/// This continuation function receives the same stack from the previous
 	/// function, with the `n_results` results removed and replaced by the
-	/// arguments passed to [`Thread::resume`].
+	/// arguments passed to [`Managed::resume`].
 	/// Moreover, the continuation function receives the value `context` that
 	/// was originally passed.
 	/// 
