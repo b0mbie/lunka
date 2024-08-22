@@ -39,7 +39,7 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 }
 
 unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
-	let mut lua: LuaThread = LuaThread::from_ptr(l);
+	let lua = LuaThread::from_ptr(l);
 
 	if let Some(msg) = lua.to_string(1) {
 		lua.traceback(&lua, Some(msg), 1);
@@ -59,8 +59,8 @@ unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 	1
 }
 
-unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
-	let mut lua: LuaThread = LuaThread::from_ptr(lua);
+unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
+	let lua = LuaThread::from_ptr(l);
 
 	unsafe { lua.check_version() };
 	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
@@ -78,7 +78,7 @@ unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
 		lua.load_stdin()
 	};
 
-	if !report(&mut lua, load_status) {
+	if !report(lua, load_status) {
 		return 0
 	}
 
@@ -94,7 +94,7 @@ unsafe extern "C" fn l_main(lua: *mut LuaState) -> c_int {
 		mg.stop_gc();
 		run_status
 	});
-	if !report(&mut lua, run_status) {
+	if !report(lua, run_status) {
 		return 0
 	}
 

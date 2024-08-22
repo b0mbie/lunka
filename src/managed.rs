@@ -16,6 +16,7 @@ use core::{
 	ops::{
 		Deref, DerefMut
 	},
+	ptr::null_mut,
 	slice::from_raw_parts,
 };
 
@@ -34,13 +35,13 @@ pub struct Managed<'l> {
 impl<'l> Deref for Managed<'l> {
 	type Target = Thread;
 	fn deref(&self) -> &Self::Target {
-		unsafe { &*(self as *const _ as *const Self::Target) }
+		unsafe { Thread::from_ptr(self.l) }
 	}
 }
 
 impl<'l> DerefMut for Managed<'l> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		unsafe { &mut *(self as *mut _ as *mut Self::Target) }
+		unsafe { Thread::from_ptr(self.l) }
 	}
 }
 
@@ -236,6 +237,56 @@ impl<'l> Managed<'l> {
 	#[inline(always)]
 	pub unsafe fn length_of(&mut self, index: c_int) {
 		unsafe { lua_len(self.l, index) }
+	}
+
+	/// Start or resume this thread (like a coroutine).
+	/// 
+	/// See also [`Managed::resume_from`].
+	/// 
+	/// This function returns [`Status::Yielded`] if the coroutine yields,
+	/// [`Status::Ok`] if the coroutine finishes its execution without errors,
+	/// or an error code in case of errors.
+	/// In case of errors, the error object is on the top of the stack.
+	/// 
+	/// # Starting a coroutine
+	/// To start a coroutine:
+	/// - Push the main function plus any arguments onto the empty stack of the
+	/// thread.
+	/// - Then, call this function, with `n_args` being the number of arguments.
+	/// This call returns when the coroutine suspends or finishes its execution.
+	/// 
+	/// When it returns, the number of results is saved and the top of the stack
+	/// contains the values passed to [`Thread::yield_with`] or returned by the
+	/// body function.
+	/// 
+	/// # Resuming a coroutine
+	/// To resume a coroutine:
+	/// - Remove the yielded values from its stack.
+	/// - Push the values to be passed as results from the yield.
+	/// - Call this function.
+	#[inline(always)]
+	pub fn resume(&mut self, n_args: c_uint) -> (Status, c_int) {
+		let mut n_res = 0;
+		let status = unsafe { lua_resume(
+			self.as_ptr(), null_mut(),
+			n_args as _,
+			&mut n_res as *mut _
+		) };
+		(unsafe { Status::from_c_int_unchecked(status) }, n_res)
+	}
+
+	/// Resume this thread, also specifying the thread that is resuming this one.
+	/// 
+	/// See [`Managed::resume`] for more information.
+	#[inline(always)]
+	pub fn resume_from(&mut self, from: &Self, n_args: c_uint) -> (Status, c_int) {
+		let mut n_res = 0;
+		let status = unsafe { lua_resume(
+			self.as_ptr(), from.as_ptr(),
+			n_args as _,
+			&mut n_res as *mut _
+		) };
+		(unsafe { Status::from_c_int_unchecked(status) }, n_res)
 	}
 
 	/// Call a function (or a callable object) in protected mode.

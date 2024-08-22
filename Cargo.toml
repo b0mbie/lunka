@@ -26,6 +26,9 @@ name = "push_trait"
 name = "os2"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "string_enum"
+
 [features]
 # Use Rust's `alloc` crate.
 alloc = []
