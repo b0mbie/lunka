@@ -876,46 +876,6 @@ impl Thread {
 		unsafe { lua_replace(self.as_ptr(), index) }
 	}
 
-	/// Start or resume this [`Thread`] (like a coroutine).
-	/// 
-	/// `from` represents the coroutine that is resuming this one.
-	/// If there is no such coroutine, this parameter can be `None`. 
-	/// 
-	/// This function returns [`Status::Yielded`] if the coroutine yields,
-	/// [`Status::Ok`] if the coroutine finishes its execution without errors,
-	/// or an error code in case of errors.
-	/// In case of errors, the error object is on the top of the stack.
-	/// 
-	/// # Starting a coroutine
-	/// To start a coroutine:
-	/// - Push the main function plus any arguments onto the empty stack of the
-	/// thread.
-	/// - Then, call this function, with `n_args` being the number of arguments.
-	/// This call returns when the coroutine suspends or finishes its execution.
-	/// 
-	/// When it returns, the number of results is saved and the top of the stack
-	/// contains the values passed to [`Thread::yield_with`] or returned by the
-	/// body function.
-	/// 
-	/// # Resuming a coroutine
-	/// To resume a coroutine:
-	/// - Remove the yielded values from its stack
-	/// - Push the values to be passed as results from the yield
-	/// - Call this function.
-	#[inline(always)]
-	pub fn resume(
-		&self, from: Option<&Self>,
-		n_args: c_int
-	) -> (Status, c_int) {
-		let mut n_res = 0;
-		let status = unsafe { lua_resume(
-			self.as_ptr(), from.map(|lua| lua.as_ptr()).unwrap_or(null_mut()),
-			n_args,
-			&mut n_res as *mut _
-		) };
-		(unsafe { Status::from_c_int_unchecked(status) }, n_res)
-	}
-
 	/// Rotate the stack elements between the valid index `index` and the top of
 	/// the stack.
 	/// 
