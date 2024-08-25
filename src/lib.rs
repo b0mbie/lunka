@@ -115,7 +115,7 @@ pub enum GcMode {
 }
 
 /// Panic function that's similar to the panic function defined in `lauxlib.h`.
-pub unsafe extern "C" fn lua_panic(l: *mut State) -> c_int {
+pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
 	let msg = {
 		let msg_str = lua_tostring(l, -1);
 		if msg_str.is_null() {
@@ -369,7 +369,7 @@ impl Lua {
 	}
 
 	/// Construct a new [`Lua`] using an already-allocated Lua state, and set
-	/// its panic function to [`lua_panic`].
+	/// its panic function to [`lua_panic_handler`].
 	/// 
 	/// # Safety
 	/// `l` must be a valid pointer to a Lua state.
@@ -380,7 +380,7 @@ impl Lua {
 	#[inline(always)]
 	pub unsafe fn from_ptr(l: *mut State) -> Self {
 		let thread = Thread::from_ptr(l);
-		thread.at_panic(Some(lua_panic));
+		thread.at_panic(Some(lua_panic_handler));
 		Self {
 			thread
 		}
