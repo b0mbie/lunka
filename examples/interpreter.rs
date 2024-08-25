@@ -1,18 +1,20 @@
 //! (Very) simple Lua interpreter.
 
 use lunka::prelude::*;
-use std::env::args;
-use std::ffi::{
-	c_int,
-	c_uint,
-	CStr
+use std::{
+	env::args,
+	ffi::{
+		c_int,
+		c_uint,
+		CStr
+	},
+	io::{
+		stderr,
+		Write
+	},
+	mem::transmute,
+	process::ExitCode
 };
-use std::io::{
-	stderr,
-	Write
-};
-use std::mem::transmute;
-use std::process::ExitCode;
 
 macro_rules! cstr {
 	($data:literal) => {
@@ -103,7 +105,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 }
 
 fn main() -> ExitCode {
-	let Some(mut lua) = Lua::new() else {
+	let Some(mut lua) = Lua::try_new() else {
 		eprintln!("cannot create state: not enough memory");
 		return ExitCode::FAILURE
 	};

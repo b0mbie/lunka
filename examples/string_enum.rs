@@ -86,7 +86,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 }
 
 fn main() {
-	let mut lua = Lua::new().expect("not enough memory to allocate state");
+	let mut lua = Lua::new();
 	let did_run_ok = lua.run_managed(move |mut mg| {
 		mg.push_c_function(l_main);
 		mg.pcall(0, 1, 0).is_ok()

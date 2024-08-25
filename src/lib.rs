@@ -188,15 +188,15 @@ pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
 /// unsafe impl Sync for MtLua {}
 /// 
 /// impl MtLua {
-/// 	pub fn new() -> Option<Self> {
-/// 		let lua = Lua::new()?;
-/// 		Some(Self {
+/// 	pub fn new() -> Self {
+/// 		let lua = Lua::new();
+/// 		Self {
 /// 			lua
-/// 		})
+/// 		}
 /// 	}
 /// }
 /// 
-/// let lua = MtLua::new().unwrap();
+/// let lua = MtLua::new();
 /// assert_eq!(lua.version(), lunka::cdef::VERSION_NUM);
 /// ```
 #[derive(Debug)]
@@ -237,31 +237,75 @@ impl Lua {
 		}
 	}
 
-	/// Potentially construct a new [`Lua`] using the `lauxlib` function
-	/// [`luaL_newstate`].
+	/// Construct a new [`Lua`] using the `lauxlib` function [`luaL_newstate`].
+	/// 
+	/// Unlike [`Lua::try_new_auxlib`], this function never fails.
+	#[cfg(feature = "auxlib")]
+	#[inline(always)]
+	pub fn new_auxlib() -> Self {
+		match unsafe { Self::from_l(luaL_newstate()) } {
+			Some(lua) => lua,
+			_ => panic!(concat!(
+				"not enough memory to create Lua state ",
+				"using the `lauxlib.h` allocator"
+			)),
+		}
+	}
+
+	/// Construct a new [`Lua`] using the `lauxlib` function [`luaL_newstate`].
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "auxlib")]
 	#[inline(always)]
-	pub fn new_auxlib() -> Option<Self> {
+	pub fn try_new_auxlib() -> Option<Self> {
 		unsafe { Self::from_l(luaL_newstate()) }
+	}
+
+	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
+	/// 
+	/// Unlike [`Lua::try_new_with_alloc_fn`], this function never fails.
+	#[inline(always)]
+	pub fn new_with_alloc_fn(
+		alloc_fn: Alloc, alloc_fn_data: *mut c_void
+	) -> Self {
+		match unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) } {
+			Some(lua) => lua,
+			_ => panic!(concat!(
+				"not enough memory to create Lua state ",
+				"using a custom allocator function"
+			)),
+		}
 	}
 
 	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[inline(always)]
-	pub fn new_with_alloc_fn(
+	pub fn try_new_with_alloc_fn(
 		alloc_fn: Alloc, alloc_fn_data: *mut c_void
 	) -> Option<Self> {
 		unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
-	/// Potentially construct a new [`Lua`] using the global Rust allocator.
+	/// Construct a new [`Lua`] using the global Rust allocator.
+	/// 
+	/// Unlike [`Lua::try_new`], this function never fails.
+	#[inline(always)]
+	pub fn new() -> Self {
+		match Self::try_new() {
+			Some(lua) => lua,
+			_ => panic!(concat!(
+				"not enough memory to create Lua state ",
+				"using the global Rust allocator"
+			)),
+		}
+	}
+
+	/// Construct a new [`Lua`] using the global Rust allocator.
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "alloc")]
-	pub fn new() -> Option<Self> {
+	pub fn try_new() -> Option<Self> {
 		use alloc::alloc::{
 			Layout,
 			alloc,
@@ -512,7 +556,7 @@ macro_rules! lua_fmt_error {
 /// use lunka::prelude::*;
 /// 
 /// unsafe extern "C" fn l_get_pi(l: *mut LuaState) -> core::ffi::c_int {
-/// 	let lua: LuaThread = LuaThread::from_ptr(l);
+/// 	let lua = LuaThread::from_ptr(l);
 /// 	lua.push_number(3.14);
 /// 	1
 /// }

@@ -1,10 +1,7 @@
 //! Example of extending `Thread` to add an overloaded `push` method.
 
+use core::ffi::CStr;
 use lunka::prelude::*;
-use std::{
-	ffi::CStr,
-	process::ExitCode
-};
 
 const PRINT_CODE: &'static str = r#"print("Received arguments: ", ...)"#;
 
@@ -65,16 +62,12 @@ impl LuaThreadExt for LuaThread {
 	}
 }
 
-fn main() -> ExitCode {
-	let Some(mut lua) = Lua::new() else {
-		eprintln!("cannot create state: not enough memory");
-		return ExitCode::FAILURE
-	};
+fn main() {
+	let mut lua = Lua::new();
 	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
 
 	if !lua.load_byte_str(PRINT_CODE.as_bytes(), PRINT_CODE_LUA_NAME).is_ok() {
-		eprintln!("couldn't load Lua chunk");
-		return ExitCode::FAILURE
+		panic!("couldn't load Lua chunk");
 	}
 
 	lua.push(4 as LuaInteger);
@@ -86,13 +79,10 @@ fn main() -> ExitCode {
 		mg.pcall(3, 0, 0)
 	}).is_ok() {
 		let error_bytes = unsafe { lua.to_byte_str(-1) };
-		eprintln!(
+		panic!(
 			"error while running Lua chunk: {}",
 			error_bytes.map(String::from_utf8_lossy)
 				.unwrap_or(std::borrow::Cow::Borrowed("<no message>"))
 		);
-		return ExitCode::FAILURE
 	}
-
-	ExitCode::SUCCESS
 }
