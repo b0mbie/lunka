@@ -41,7 +41,7 @@ impl<'l> Deref for Managed<'l> {
 
 impl<'l> DerefMut for Managed<'l> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		unsafe { Thread::from_ptr(self.l) }
+		unsafe { Thread::from_ptr_mut(self.l) }
 	}
 }
 

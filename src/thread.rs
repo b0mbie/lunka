@@ -101,9 +101,6 @@ macro_rules! lua_is {
 /// formally prove that a reference would not be collected without using stack
 /// indices. This model simply utilizes checks done at compile time to ensure
 /// safety.
-/// 
-/// # Layout
-/// [`Thread`] is guaranteed to have the same layout as a [`*mut State`](State).
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Thread {
@@ -111,12 +108,29 @@ pub struct Thread {
 }
 
 impl Thread {
-	/// Construct a [`Thread`] from a raw C pointer to a Lua state.
+	/// Construct a reference to [`Thread`] from a raw C pointer to a Lua state.
 	/// 
 	/// # Safety
-	/// `l` must point to a valid Lua state (`lua_State *` in C).
+	/// `l` must point to a valid Lua state (`lua_State *` in C), for the
+	/// duration specified by `'a`.
 	#[inline(always)]
-	pub unsafe fn from_ptr<'a>(l: *mut State) -> &'a mut Self {
+	pub unsafe fn from_ptr<'a>(l: *mut State) -> &'a Self {
+		&*(l as *mut Self)
+	}
+
+	/// Construct a _mutable_ reference to [`Thread`] from a raw C pointer to a
+	/// Lua state.
+	/// 
+	/// # Safety
+	/// `l` must point to a valid Lua state (`lua_State *` in C), for the
+	/// duration specified by `'a`.
+	/// 
+	/// **You must also, however, abide by Rust's aliasing rules.**
+	/// This means that you must guarantee that there
+	/// may not be two `&mut Thread`s that point to the same state,
+	/// nor a `&Thread` and a `&mut Thread`.
+	#[inline(always)]
+	pub unsafe fn from_ptr_mut<'a>(l: *mut State) -> &'a mut Self {
 		&mut *(l as *mut Self)
 	}
 
@@ -529,7 +543,7 @@ impl Thread {
 	#[inline(always)]
 	pub unsafe fn new_thread<'l>(&'l self) -> Coroutine<'l> {
 		Coroutine {
-			thread: unsafe { Thread::from_ptr(lua_newthread(self.as_ptr())) },
+			thread: unsafe { Thread::from_ptr_mut(lua_newthread(self.as_ptr())) },
 		}
 	}
 
@@ -1109,19 +1123,12 @@ impl Thread {
 	}
 
 	/// Convert the value at the given index to a Lua thread, represented by a
-	/// [`Thread`].
+	/// `*mut`[`State`].
 	/// 
-	/// The value must be a thread; otherwise, the function returns `None`.
+	/// The value must be a thread; otherwise, the function returns null.
 	#[inline(always)]
-	pub fn to_thread<'l>(&'l self, index: c_int) -> Option<Coroutine<'l>> {
-		let l_ptr = unsafe { lua_tothread(self.as_ptr(), index) };
-		if !l_ptr.is_null() {
-			Some(Coroutine {
-				thread: unsafe { Thread::from_ptr(l_ptr) },
-			})
-		} else {
-			None
-		}
+	pub fn to_thread<'l>(&'l self, index: c_int) -> *mut State {
+		unsafe { lua_tothread(self.as_ptr(), index) }
 	}
 
 	/// If the value at the given index is a light or full userdata, return the

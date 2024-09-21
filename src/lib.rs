@@ -136,9 +136,6 @@ pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
 /// Unlike [`Coroutine`], this data structure has a [`Drop`] implementation that
 /// automatically closes (frees) the Lua state.
 /// 
-/// # Layout
-/// [`Lua`] is guaranteed to have the same layout as [`Thread`].
-/// 
 /// # Thread safety
 /// [`Lua`] isn't [`Send`] nor [`Sync`] because of [`Thread`], which doesn't
 /// implement any of those traits either.
@@ -229,7 +226,7 @@ impl Lua {
 	unsafe fn from_l(l: *mut State) -> Option<Self> {
 		if !l.is_null() {
 			let lua = Self {
-				thread: unsafe { Thread::from_ptr(l) }
+				thread: unsafe { Thread::from_ptr_mut(l) }
 			};
 			Some(lua)
 		} else {
@@ -423,7 +420,7 @@ impl Lua {
 	/// coroutine will not be owned by Rust code.
 	#[inline(always)]
 	pub unsafe fn from_ptr(l: *mut State) -> Self {
-		let thread = Thread::from_ptr(l);
+		let thread = Thread::from_ptr_mut(l);
 		thread.at_panic(Some(lua_panic_handler));
 		Self {
 			thread
@@ -444,9 +441,6 @@ impl Lua {
 /// This type does not have a [`Drop`] implementation.
 /// Any threads that are not used anymore must either be closed manually with
 /// [`Coroutine::close`] or left to be garbage-collected by Lua.
-/// 
-/// # Layout
-/// [`Coroutine`] is guaranteed to have the same layout as [`Thread`].
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Coroutine<'l> {

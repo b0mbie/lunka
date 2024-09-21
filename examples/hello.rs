@@ -7,7 +7,7 @@ use core::ffi::{
 use lunka::prelude::*;
 
 unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
-	let lua = unsafe { LuaThread::from_ptr(l) };
+	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	lua.run_managed(move |mut mg| unsafe { mg.open_libs() });
 
 	let is_ok = lua.load_byte_str(

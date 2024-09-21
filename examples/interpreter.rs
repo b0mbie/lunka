@@ -41,7 +41,7 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 }
 
 unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
-	let lua = LuaThread::from_ptr(l);
+	let lua = LuaThread::from_ptr_mut(l);
 
 	if let Some(msg) = lua.to_string(1) {
 		lua.traceback(&lua, Some(msg), 1);
@@ -62,7 +62,7 @@ unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 }
 
 unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
-	let lua = LuaThread::from_ptr(l);
+	let lua = LuaThread::from_ptr_mut(l);
 
 	unsafe { lua.check_version() };
 	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
@@ -105,10 +105,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 }
 
 fn main() -> ExitCode {
-	let Some(mut lua) = Lua::try_new() else {
-		eprintln!("cannot create state: not enough memory");
-		return ExitCode::FAILURE
-	};
+	let mut lua = Lua::new();
 
 	lua.push_c_function(l_main);
 	let status = lua.run_managed(|mut mg| mg.pcall(0, 1, 0));
