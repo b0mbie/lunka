@@ -20,7 +20,7 @@ unsafe extern "C" fn l_hello(l: *mut LuaState) -> c_int {
 	let n = unsafe { lua.check_number(1) };
 
 	// SAFETY: Ditto.
-	unsafe { lua.push_byte_str(b"Hello, world!") };
+	unsafe { lua.push_string("Hello, world!") };
 	lua.push_number(n * core::f64::consts::PI as LuaNumber);
 
 	2
