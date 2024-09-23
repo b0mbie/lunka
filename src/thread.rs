@@ -599,10 +599,10 @@ impl Thread {
 	/// returns `false` and pushes nothing.
 	/// 
 	/// # Note on string conversion functions
-	/// While traversing a table, avoid calling [`Thread::to_chars`] directly on
-	/// a key, unless it is known that the key is actually a **string**.
-	/// [`Thread::to_chars`] and other similar functions may change the value at
-	/// the given index; this confuses the next call to [`Thread::next`].
+	/// While traversing a table, avoid calling [`Thread::to_c_chars`] directly
+	/// on a key, unless it is known that the key is actually a **string**.
+	/// [`Thread::to_c_chars`] and other similar functions may change the value
+	/// at the given index; this confuses the next call to [`Thread::next`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if a given
@@ -693,12 +693,12 @@ impl Thread {
 	/// after the function returns.
 	/// The string can contain any binary data, including embedded zeros.
 	/// 
-	/// See also [`Thread::push_byte_str`].
+	/// See also [`Thread::push_string`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn push_chars<'l>(&'l self, data: &[c_char]) -> &'l [c_char] {
+	pub unsafe fn push_c_chars<'l>(&'l self, data: &[c_char]) -> &'l [c_char] {
 		let length = data.len();
 		unsafe { from_raw_parts(
 			lua_pushlstring(self.as_ptr(), data.as_ptr(), length),
@@ -706,18 +706,19 @@ impl Thread {
 		) }
 	}
 
-	/// Works the same as [`Thread::push_chars`], however it accepts [`u8`]s
+	/// Works the same as [`Thread::push_c_chars`], however it accepts [`u8`]s
 	/// instead of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn push_byte_str<'l>(&'l self, data: &[u8]) -> &'l [u8] {
-		let length = data.len();
+	pub unsafe fn push_string<'l>(&'l self, data: impl AsRef<[u8]>) -> &'l [u8] {
+		let slice = data.as_ref();
+		let length = slice.len();
 		unsafe { from_raw_parts(
 			lua_pushlstring(
 				self.as_ptr(),
-				data.as_ptr() as *const _, length
+				slice.as_ptr() as *const _, length
 			) as *const _,
 			length
 		) }
@@ -741,12 +742,12 @@ impl Thread {
 	/// memory pointed to by `data` can be freed or reused immediately after the
 	/// function returns.
 	/// 
-	/// See also [`Thread::push_chars`] and [`Thread::push_byte_str`].
+	/// See also [`Thread::push_c_chars`] and [`Thread::push_string`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn push_string<'l>(&'l self, data: &CStr) -> &'l CStr {
+	pub unsafe fn push_c_str<'l>(&'l self, data: &CStr) -> &'l CStr {
 		unsafe { CStr::from_ptr(
 			lua_pushstring(self.as_ptr(), data.as_ptr())
 		) }
@@ -1041,7 +1042,7 @@ impl Thread {
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_chars<'l>(
+	pub unsafe fn to_c_chars<'l>(
 		&'l self, index: c_int
 	) -> Option<&'l [c_char]> {
 		let mut len = 0;
@@ -1053,13 +1054,13 @@ impl Thread {
 		}
 	}
 
-	/// Works the same as [`Thread::to_chars`], however it returns a slice of
+	/// Works the same as [`Thread::to_c_chars`], however it returns a slice of
 	/// [`u8`]s instead of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_byte_str<'l>(
+	pub unsafe fn to_string<'l>(
 		&'l self, index: c_int
 	) -> Option<&'l [u8]> {
 		let mut len = 0;
@@ -1105,15 +1106,15 @@ impl Thread {
 		unsafe { lua_topointer(self.as_ptr(), idx) }
 	}
 
-	/// This behaves exactly like [`Thread::to_chars`], however the return value
-	/// is a [`CStr`].
+	/// This behaves exactly like [`Thread::to_c_chars`], however the return
+	/// value is a [`CStr`].
 	/// 
-	/// See also [`Thread::to_byte_str`].
+	/// See also [`Thread::to_string`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_string<'l>(&'l self, index: c_int) -> Option<&'l CStr> {
+	pub unsafe fn to_c_str<'l>(&'l self, index: c_int) -> Option<&'l CStr> {
 		let str_ptr = unsafe { lua_tostring(self.as_ptr(), index) };
 		if !str_ptr.is_null() {
 			Some(unsafe { CStr::from_ptr(str_ptr) })
@@ -1539,20 +1540,20 @@ impl Thread {
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string.
 	#[inline(always)]
-	pub unsafe fn check_chars<'l>(&'l self, arg: c_int) -> &'l [c_char] {
+	pub unsafe fn check_c_chars<'l>(&'l self, arg: c_int) -> &'l [c_char] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_checklstring(self.as_ptr(), arg, &mut len as *mut _) };
 		unsafe { from_raw_parts(str_ptr, len) }
 	}
 
-	/// Works the same as [`Thread::check_chars`], however it returns an array
+	/// Works the same as [`Thread::check_c_chars`], however it returns an array
 	/// of [`u8`]s instead of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string.
 	#[inline(always)]
-	pub unsafe fn check_byte_str<'l>(&'l self, arg: c_int) -> &'l [u8] {
+	pub unsafe fn check_string<'l>(&'l self, arg: c_int) -> &'l [u8] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_checklstring(self.as_ptr(), arg, &mut len as *mut _) };
 		unsafe { from_raw_parts(str_ptr as *const _, len) }
@@ -1621,7 +1622,7 @@ impl Thread {
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string.
 	#[inline(always)]
-	pub unsafe fn check_string<'l>(&'l self, arg: c_int) -> &'l CStr {
+	pub unsafe fn check_c_str<'l>(&'l self, arg: c_int) -> &'l CStr {
 		let str_ptr = unsafe { luaL_checkstring(self.as_ptr(), arg) };
 		unsafe { CStr::from_ptr(str_ptr) }
 	}
@@ -1672,7 +1673,7 @@ impl Thread {
 	/// 
 	/// This function never returns.
 	#[inline(always)]
-	pub fn error_str(&self, message: &CStr) -> ! {
+	pub fn error_c_str(&self, message: &CStr) -> ! {
 		unsafe { luaL_error(
 			self.as_ptr(),
 			CStr::from_bytes_with_nul_unchecked(b"%s\0").as_ptr(),
@@ -1737,7 +1738,7 @@ impl Thread {
 	/// `name` is the chunk name, used for debug information and error messages.
 	// /// The string mode works as in the function lua_load. 
 	#[inline(always)]
-	pub fn load_chars(&self, buffer: &[c_char], name: &CStr) -> Status {
+	pub fn load_c_chars(&self, buffer: &[c_char], name: &CStr) -> Status {
 		unsafe { Status::from_c_int_unchecked(
 			luaL_loadbuffer(
 				self.as_ptr(),
@@ -1747,14 +1748,15 @@ impl Thread {
 		) }
 	}
 
-	/// Works the same as [`Thread::load_chars`], however it accepts an array of
-	/// [`u8`]s instead of [`c_char`]s.
+	/// Works the same as [`Thread::load_c_chars`], however it accepts an array
+	/// of [`u8`]s instead of [`c_char`]s.
 	#[inline(always)]
-	pub fn load_byte_str(&self, buffer: &[u8], name: &CStr) -> Status {
+	pub fn load_string(&self, buffer: impl AsRef<[u8]>, name: &CStr) -> Status {
+		let slice = buffer.as_ref();
 		unsafe { Status::from_c_int_unchecked(
 			luaL_loadbuffer(
 				self.as_ptr(),
-				buffer.as_ptr() as *const _, buffer.len(),
+				slice.as_ptr() as *const _, slice.len(),
 				name.as_ptr()
 			)
 		) }
@@ -1796,7 +1798,7 @@ impl Thread {
 	/// This function uses [`Thread::load`] to load the chunk in the
 	/// zero-terminated string `code`.
 	#[inline(always)]
-	pub fn load_string(&self, code: &CStr) -> Status {
+	pub fn load_c_str(&self, code: &CStr) -> Status {
 		unsafe { Status::from_c_int_unchecked(
 			luaL_loadstring(self.as_ptr(), code.as_ptr())
 		) }
@@ -1841,13 +1843,13 @@ impl Thread {
 	/// If the function argument `arg` is a string, return this string, or
 	/// return `default`.
 	/// 
-	/// This function uses [`Thread::to_chars`] to get its result, so all
+	/// This function uses [`Thread::to_c_chars`] to get its result, so all
 	/// conversions and caveats of that function apply here. 
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string, isn't a `nil` and not absent.
-	pub unsafe fn opt_chars<'l>(
+	pub unsafe fn opt_c_chars<'l>(
 		&'l self, arg: c_int, default: &'l CStr
 	) -> &'l [c_char] {
 		let mut len = 0;
@@ -1858,13 +1860,13 @@ impl Thread {
 		unsafe { from_raw_parts(str_ptr, len) }
 	}
 
-	/// Works the same as [`Thread::opt_chars`], however it returns an array of
-	/// [`u8`]s instead of [`c_char`]s.
+	/// Works the same as [`Thread::opt_c_chars`], however it returns an array
+	/// of [`u8`]s instead of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string, isn't a `nil` and not absent.
-	pub unsafe fn opt_byte_str<'l>(
+	pub unsafe fn opt_string<'l>(
 		&'l self, arg: c_int, default: &'l [u8]
 	) -> &'l [u8] {
 		let mut len = 0;
@@ -1891,7 +1893,7 @@ impl Thread {
 	/// # Safety
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// argument `arg` isn't a string, isn't a `nil` and not absent.
-	pub unsafe fn opt_string<'l>(
+	pub unsafe fn opt_c_str<'l>(
 		&'l self, arg: c_int, default: &'l CStr
 	) -> &'l CStr {
 		unsafe { CStr::from_ptr(luaL_optstring(self.as_ptr(), arg, default.as_ptr())) }
@@ -2038,7 +2040,7 @@ impl Thread {
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn where_str(&self, level: c_int) {
+	pub unsafe fn where_string(&self, level: c_int) {
 		unsafe { luaL_where(self.as_ptr(), level) }
 	}
 }

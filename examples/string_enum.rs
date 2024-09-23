@@ -70,10 +70,10 @@ unsafe extern "C" fn l_test(l: *mut LuaState) -> c_int {
 
 unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 	let lua = unsafe { LuaThread::from_ptr_mut(l) };
-	let mut test = move |variant| {
+	let mut test = move |variant: &[u8]| {
 		lua.run_managed(move |mut mg| {
 			mg.push_c_function(l_test);
-			mg.push_byte_str(variant);
+			mg.push_string(variant);
 			mg.call(1, 0)
 		})
 	};

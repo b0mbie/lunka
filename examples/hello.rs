@@ -10,13 +10,13 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	lua.run_managed(move |mut mg| unsafe { mg.open_libs() });
 
-	let is_ok = lua.load_byte_str(
-		b"print(\"Hello, world!\")",
+	let is_ok = lua.load_string(
+		r#"print("Hello, world!")"#,
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"=<embedded>\0") }
 	).is_ok();
 	if !is_ok {
 		let error = {
-			unsafe { lua.to_byte_str(-1) }
+			unsafe { lua.to_string(-1) }
 				.and_then(move |bytes| core::str::from_utf8(bytes).ok())
 				.unwrap_or("<message is not UTF-8>")
 		};
@@ -28,7 +28,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 	let is_ok = lua.run_managed(move |mut mg| mg.pcall(0, 0, 0).is_ok());
 	if !is_ok {
 		let error = {
-			unsafe { lua.to_byte_str(-1) }
+			unsafe { lua.to_string(-1) }
 				.and_then(move |bytes| core::str::from_utf8(bytes).ok())
 				.unwrap_or("<message is not UTF-8>")
 		};

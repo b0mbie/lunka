@@ -20,7 +20,7 @@ macro_rules! c_str {
 
 unsafe extern "C" fn l_metadata(l: *mut LuaState) -> c_int {	
 	let lua = LuaThread::from_ptr_mut(l);
-	let path = lua.check_byte_str(1);
+	let path = lua.check_string(1);
 	
 	let meta = match metadata(String::from_utf8_lossy(path).into_owned()) {
 		Ok(meta) => meta,
@@ -36,7 +36,7 @@ unsafe extern "C" fn l_metadata(l: *mut LuaState) -> c_int {
 		mg.create_table(0, 1);
 
 		let file_type = meta.file_type();
-		mg.push_byte_str(if file_type.is_file() {
+		mg.push_string(if file_type.is_file() {
 			"file"
 		} else if file_type.is_dir() {
 			"directory"

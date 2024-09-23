@@ -30,7 +30,7 @@ fn c_eprintln(data: &CStr) {
 
 fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 	if !status.is_ok() {
-		if let Some(message) = unsafe { lua.to_string(-1) } {
+		if let Some(message) = unsafe { lua.to_c_str(-1) } {
 			c_eprintln(message);
 		}
 		lua.run_managed(|mut mg| unsafe { mg.pop(1) });
@@ -43,7 +43,7 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr_mut(l);
 
-	if let Some(msg) = lua.to_string(1) {
+	if let Some(msg) = lua.to_c_str(1) {
 		lua.traceback(&lua, Some(msg), 1);
 		return 1
 	}
@@ -86,7 +86,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 
 	let mut arg_count: c_uint = 0;
 	for arg in arguments {
-		unsafe { lua.push_byte_str(arg.as_bytes()) };
+		unsafe { lua.push_string(arg.as_bytes()) };
 		arg_count += 1;
 	}
 
