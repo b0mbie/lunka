@@ -1813,6 +1813,19 @@ impl Thread {
 		unsafe { luaL_newlib(self.as_ptr(), library.as_reg_slice()) }
 	}
 
+	/// Create a new table with a size optimized to store all entries in
+	/// `library`, but does not actually store them.
+	/// 
+	/// This function is intended to be used in conjunction with
+	/// [`Thread::set_funcs`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn new_lib_table<const N: usize>(&self, library: &Library<'_, N>) {
+		unsafe { luaL_newlibtable(self.as_ptr(), library.as_reg_slice()) }
+	}
+
 	/// If the registry already doesn't have the key `table_name`, create a new
 	/// table to be used as a metatable for userdata and return `true`.
 	/// Otherwise, return `false`.
