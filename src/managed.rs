@@ -534,8 +534,10 @@ impl<'l> Managed<'l> {
 		unsafe { luaL_len(self.l, obj_index) }
 	}
 
-	/// Similar to [`Managed::to_string_meta`], however the return value is a
-	/// slice of [`c_char`]s.
+	/// Convert any Lua value at the given index to a string in a reasonable
+	/// format, and push that string onto the stack.
+	/// 
+	/// This function works the same way as [`Managed::to_string_meta`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
@@ -552,10 +554,10 @@ impl<'l> Managed<'l> {
 		}
 	}
 
-	/// Similar to [`Managed::to_c_chars_meta`], however the return value is
-	/// [`CStr`].
+	/// Convert any Lua value at the given index to a string in a reasonable
+	/// format, and push that string onto the stack.
 	/// 
-	/// See also [`Thread::to_string`].
+	/// This function works the same way as [`Managed::to_string_meta`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -573,7 +575,7 @@ impl<'l> Managed<'l> {
 	/// Convert any Lua value at the given index to a string in a reasonable
 	/// format, and push that string onto the stack.
 	/// 
-	/// The string returned by the function is represented as a slice of [`u8`]s.
+	/// The string created by the function is represented as the return value.
 	/// 
 	/// If the value has a metatable with a `__tostring` field, then this
 	/// function calls the corresponding metamethod with the value as argument,
