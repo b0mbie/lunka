@@ -534,20 +534,13 @@ impl<'l> Managed<'l> {
 		unsafe { luaL_len(self.l, obj_index) }
 	}
 
-	/// Convert any Lua value at the given index to a string in a reasonable
-	/// format, and push that string onto the stack.
-	/// 
-	/// The string returned by the function is represented as a slice of
-	/// [`c_char`]s.
-	/// 
-	/// If the value has a metatable with a `__tostring` field, then this
-	/// function calls the corresponding metamethod with the value as argument,
-	/// and uses the result of the call as its result.
+	/// Similar to [`Managed::to_string_meta`], however the return value is a
+	/// slice of [`c_char`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_chars_meta<'a>(
+	pub unsafe fn to_c_chars_meta<'a>(
 		&'a mut self, index: c_int
 	) -> Option<&'a [c_char]> {
 		let mut len = 0;
@@ -559,13 +552,37 @@ impl<'l> Managed<'l> {
 		}
 	}
 
-	/// Works the same as [`Managed::to_chars_meta`], however it returns an
-	/// array of [`u8`]s instead of [`c_char`]s.
+	/// Similar to [`Managed::to_c_chars_meta`], however the return value is
+	/// [`CStr`].
+	/// 
+	/// See also [`Thread::to_string`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	pub unsafe fn to_c_str_meta<'a>(
+		&'a mut self, index: c_int
+	) -> Option<&'a CStr> {
+		let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
+		if !str_ptr.is_null() {
+			Some(unsafe { CStr::from_ptr(str_ptr) })
+		} else {
+			None
+		}
+	}
+
+	/// Convert any Lua value at the given index to a string in a reasonable
+	/// format, and push that string onto the stack.
+	/// 
+	/// The string returned by the function is represented as a slice of [`u8`]s.
+	/// 
+	/// If the value has a metatable with a `__tostring` field, then this
+	/// function calls the corresponding metamethod with the value as argument,
+	/// and uses the result of the call as its result.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn to_byte_str_meta<'a>(
+	pub unsafe fn to_string_meta<'a>(
 		&'a mut self, index: c_int
 	) -> Option<&'a [u8]> {
 		let mut len = 0;
