@@ -1829,11 +1829,18 @@ impl Thread {
 
 	/// Create a new table and register there the functions in the list `library`.
 	/// 
+	/// _Unlike_ this function's C counterpart, this will _not_ call
+	/// [`Thread::check_version`].
+	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
 	pub unsafe fn new_lib<const N: usize>(&self, library: &Library<'_, N>) {
-		unsafe { luaL_newlib(self.as_ptr(), library.as_reg_slice()) }
+		unsafe {
+			let l = self.as_ptr();
+			lua_createtable(l, 0, N as _);
+			luaL_setfuncs(l, library.as_ptr(), 0);
+		}
 	}
 
 	/// Create a new table with a size optimized to store all entries in
@@ -1846,7 +1853,8 @@ impl Thread {
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
 	pub unsafe fn new_lib_table<const N: usize>(&self, library: &Library<'_, N>) {
-		unsafe { luaL_newlibtable(self.as_ptr(), library.as_reg_slice()) }
+		let _ = library;
+		unsafe { lua_createtable(self.as_ptr(), 0, N as _) }
 	}
 
 	/// If the registry already doesn't have the key `table_name`, create a new
