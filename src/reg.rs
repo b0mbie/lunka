@@ -58,9 +58,22 @@ impl<'name, const N: usize> Library<'name, N> {
 		}
 	}
 
+	/// Return the number of functions registered.
+	#[inline(always)]
+	pub const fn n_regs() -> usize {
+		N
+	}
+
 	/// Return the number of functions registered, plus `1`.
-	pub const fn ffi_len() -> usize {
+	#[inline(always)]
+	pub const fn n_regs_1() -> usize {
 		N + 1
+	}
+
+	/// Return the number of functions registered for this set of functions.
+	#[inline(always)]
+	pub const fn len(&self) -> usize {
+		Self::n_regs()
 	}
 
 	/// Return a pointer to this structure to be used with FFI.
