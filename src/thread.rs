@@ -704,14 +704,8 @@ impl Thread {
 		unsafe { lua_pushlightuserdata(self.as_ptr(), ptr) }
 	}
 
-	/// Push a [`c_char`] array, represented by a string, onto the stack.
-	/// 
-	/// Lua will make or reuse an internal copy of the given string, so the
-	/// memory pointed to by `data` can be safely freed or reused immediately
-	/// after the function returns.
-	/// The string can contain any binary data, including embedded zeros.
-	/// 
-	/// See also [`Thread::push_string`].
+	/// Works the same as [`Thread::push_string`], however it accepts
+	/// [`c_char`]s instead of [`u8`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -724,8 +718,15 @@ impl Thread {
 		) }
 	}
 
-	/// Works the same as [`Thread::push_c_chars`], however it accepts [`u8`]s
-	/// instead of [`c_char`]s.
+	/// Push a string onto the stack.
+	/// 
+	/// The string can contain any binary data, including embedded zeros.
+	/// 
+	/// Lua will make or reuse an internal copy of the given string, so the
+	/// memory pointed to by `data` can be safely freed or reused immediately
+	/// after the function returns.
+	/// 
+	/// See also [`Thread::push_c_chars`].
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -1044,18 +1045,8 @@ impl Thread {
 		(is_num != 0).then_some(result)
 	}
 
-	/// Convert the Lua value at the given index to a slice of [`c_char`]s,
-	/// representing a Lua string.
-	/// 
-	/// The Lua value must be a string or a number; otherwise, the function
-	/// returns `None`.
-	/// 
-	/// If the value is a number, then this function also changes the *actual
-	/// value in the stack* to a string.
-	/// 
-	/// The function returns a slice to data inside the Lua state.
-	/// This string always has a zero (`'\0'`) after its last character (as in C),
-	/// but can contain other zeros in its body.
+	/// Works the same as [`Thread::to_string`], however it returns a slice of
+	/// [`c_char`]s instead of [`u8`]s.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -1072,8 +1063,18 @@ impl Thread {
 		}
 	}
 
-	/// Works the same as [`Thread::to_c_chars`], however it returns a slice of
-	/// [`u8`]s instead of [`c_char`]s.
+	/// Convert the Lua value at the given index to a slice of [`c_char`]s,
+	/// representing a Lua string.
+	/// 
+	/// The Lua value must be a string or a number; otherwise, the function
+	/// returns `None`.
+	/// 
+	/// If the value is a number, then this function also changes the *actual
+	/// value in the stack* to a string.
+	/// 
+	/// The function returns a slice to data inside the Lua state.
+	/// This string always has a zero (`'\0'`) after its last character (as in C),
+	/// but can contain other zeros in its body.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
