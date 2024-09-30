@@ -572,6 +572,24 @@ impl Thread {
 		from_raw_parts_mut(udata as *mut u8, size)
 	}
 
+	/// Similar to [`Thread::new_userdata_uv`], but do not create a slice.
+	/// 
+	/// You may use this function if you need to, for instance, cast the
+	/// resulting pointer to some other type `*mut T` for further usage.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// See also [`Thread::new_userdata_uv`] for lifetime specifications.
+	#[inline(always)]
+	pub unsafe fn new_userdata_uv_raw(
+		&self,
+		size: usize,
+		n_uservalues: c_ushort
+	) -> *mut c_void {
+		unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues as _) }
+	}
+
 	/// Similar to [`Thread::new_userdata_uv`], but takes an already existing
 	/// value and writes it to the allocated userdata.
 	/// 
