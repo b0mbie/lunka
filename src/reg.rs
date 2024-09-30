@@ -76,7 +76,7 @@ impl<'name, const N: usize> Library<'name, N> {
 		Self::n_regs()
 	}
 
-	/// Return a pointer to this structure to be used with FFI.
+	/// Return a pointer to this structure to be used with C.
 	pub const fn as_ptr(&self) -> *const Reg {
 		unsafe { transmute(self as *const _) }
 	}

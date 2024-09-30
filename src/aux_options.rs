@@ -55,7 +55,7 @@ impl<'str, const N: usize> AuxOptions<'str, N> {
 		N
 	}
 
-	/// Return a pointer to this structure to be used with FFI.
+	/// Return a pointer to this structure to be used with C.
 	pub const fn as_ptr(&self) -> *const *const c_char {
 		unsafe { transmute(self as *const _) }
 	}
