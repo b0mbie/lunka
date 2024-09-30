@@ -2037,6 +2037,21 @@ impl Thread {
 		) }
 	}
 
+	/// Create and push a traceback of the stack of this thread to its own stack.
+	/// 
+	/// This function works like [`Thread::traceback`].
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	#[inline(always)]
+	pub unsafe fn traceback_self(&self, message: Option<&CStr>, level: c_int) {
+		unsafe { luaL_traceback(
+			self.as_ptr(), self.as_ptr(),
+			message.map(|cstr| cstr.as_ptr()).unwrap_or(null()),
+			level
+		) }
+	}
+
 	/// Raise a type error for the argument `arg` of the C function that called
 	/// it, using a standard message;
 	/// `type_name` is a "name" for the expected type.
