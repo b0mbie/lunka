@@ -32,14 +32,30 @@ pub struct Managed<'l> {
     pub(crate) _life: PhantomData<&'l mut Thread>
 }
 
+impl<'l> AsRef<Thread> for Managed<'l> {
+	#[inline(always)]
+	fn as_ref(&self) -> &Thread {
+		unsafe { Thread::from_ptr(self.l) }
+	}
+}
+
+impl<'l> AsMut<Thread> for Managed<'l> {
+	#[inline(always)]
+	fn as_mut(&mut self) -> &mut Thread {
+		unsafe { Thread::from_ptr_mut(self.l) }
+	}
+}
+
 impl<'l> Deref for Managed<'l> {
 	type Target = Thread;
+	#[inline(always)]
 	fn deref(&self) -> &Self::Target {
 		unsafe { Thread::from_ptr(self.l) }
 	}
 }
 
 impl<'l> DerefMut for Managed<'l> {
+	#[inline(always)]
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		unsafe { Thread::from_ptr_mut(self.l) }
 	}

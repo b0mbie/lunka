@@ -208,16 +208,32 @@ impl Drop for Lua {
 	}
 }
 
+impl AsRef<Thread> for Lua {
+	#[inline(always)]
+	fn as_ref(&self) -> &Thread {
+		self.thread
+	}
+}
+
+impl AsMut<Thread> for Lua {
+	#[inline(always)]
+	fn as_mut(&mut self) -> &mut Thread {
+		self.thread
+	}
+}
+
 impl Deref for Lua {
 	type Target = Thread;
+	#[inline(always)]
 	fn deref(&self) -> &Self::Target {
-		&self.thread
+		self.thread
 	}
 }
 
 impl DerefMut for Lua {
+	#[inline(always)]
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.thread
+		self.thread
 	}
 }
 
@@ -447,14 +463,30 @@ pub struct Coroutine<'l> {
 	thread: &'l mut Thread,
 }
 
+impl<'l> AsRef<Thread> for Coroutine<'l> {
+	#[inline(always)]
+	fn as_ref(&self) -> &Thread {
+		self.thread
+	}
+}
+
+impl<'l> AsMut<Thread> for Coroutine<'l> {
+	#[inline(always)]
+	fn as_mut(&mut self) -> &mut Thread {
+		self.thread
+	}
+}
+
 impl<'l> Deref for Coroutine<'l> {
 	type Target = Thread;
+	#[inline(always)]
 	fn deref(&self) -> &Self::Target {
 		self.thread
 	}
 }
 
 impl<'l> DerefMut for Coroutine<'l> {
+	#[inline(always)]
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		self.thread
 	}
