@@ -2,14 +2,14 @@
 //! them to prevent name clashes.
 
 #[cfg(feature = "auxlib")]
-pub use {
-	crate::auxlib::Reg as LuaReg,
-	crate::aux_options::AuxOptions as LuaAuxOptions,
-	crate::reg::Library as LuaLibrary
+pub use crate::{
+	auxlib::Reg as LuaReg,
+	aux_options::AuxOptions as LuaAuxOptions,
+	reg::Library as LuaLibrary
 };
 
-pub use {
-	crate::cdef::{
+pub use crate::{
+	cdef::{
 		Alloc as LuaAlloc,
 		Arith as LuaArith,
 		CFunction as LuaCFunction,
@@ -29,11 +29,11 @@ pub use {
 		DEFAULT_ID_SIZE as LUA_DEFAULT_ID_SIZE,
 		lua_upvalueindex as lua_upvalue_index
 	},
-	crate::dbg_what::DebugWhat as LuaDebugWhat,
-	crate::Lua,
-	crate::Coroutine as LuaCoroutine,
-	crate::Thread as LuaThread,
-	crate::lua_fmt_error,
-	crate::lua_library,
-	crate::lua_push_fmt_string
+	dbg_what::DebugWhat as LuaDebugWhat,
+	Lua,
+	Coroutine as LuaCoroutine,
+	Thread as LuaThread,
+	lua_fmt_error,
+	lua_library,
+	lua_push_fmt_string
 };
