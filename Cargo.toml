@@ -29,6 +29,9 @@ crate-type = ["cdylib"]
 [[example]]
 name = "string_enum"
 
+[[example]]
+name = "userdata_lib"
+
 [features]
 # Use Rust's `alloc` crate.
 alloc = []
