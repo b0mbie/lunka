@@ -618,3 +618,40 @@ macro_rules! lua_library {
 		) }, None)
 	};
 }
+
+/// Create an unnamed function that conforms to the signature of [`CFunction`].
+/// 
+/// The macro accepts the pattern for the [`State`] argument, followed by `=>`
+/// and the function body.
+/// The function is not a closure; it may not capture any variables.
+/// 
+/// # Examples
+/// ```
+/// use lunka::prelude::*;
+/// 
+/// #[no_mangle]
+/// unsafe extern "C" fn luaopen_mylib(l: *mut LuaState) -> core::ffi::c_int {
+/// 	let lua = LuaThread::from_ptr(l);
+/// 	lua.new_lib(&lua_library! {
+/// 		sqr: lua_function!(l => {
+/// 			let lua = LuaThread::from_ptr(l);
+/// 			let x = lua.check_number(1);
+///				lua.push_number(x * x);
+/// 			1
+///			}),
+/// 		do_nothing: lua_function!(_ => 0)
+/// 	});
+/// 	1
+/// }
+/// ```
+#[macro_export]
+macro_rules! lua_function {
+	($l:pat => $body:expr) => {{
+		unsafe extern "C" fn __lua_function_inner(
+			$l: *mut lunka::cdef::State
+		) -> core::ffi::c_int {
+			$body
+		}
+		__lua_function_inner
+	}};
+}
