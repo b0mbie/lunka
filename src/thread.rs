@@ -21,11 +21,9 @@ use core::{
 	marker::PhantomData,
 	mem::size_of,
 	ptr::{
-		null, null_mut, write, NonNull
+		null, null_mut, NonNull
 	},
-	slice::{
-		from_raw_parts, from_raw_parts_mut
-	},
+	slice::from_raw_parts,
 };
 
 macro_rules! lua_is {
@@ -551,38 +549,23 @@ impl Thread {
 	/// associated Lua values, called user values, and an associated block of
 	/// raw memory of `size` bytes.
 	/// 
+	/// The function returns a pointer to the block of memory that was allocated
+	/// by Lua.
+	/// 
 	/// The user values can be set and read with the functions
 	/// [`Thread::set_i_uservalue`] and [`Thread::get_i_uservalue`].
 	/// 
-	/// The function returns a mutable slice of the block of memory that was
-	/// allocated by Lua.
-	/// Lua ensures that the slice is valid as long as the corresponding
+	/// You may use this function if, for instance, the layout of the data in
+	/// the allocation changes based on run-time information.
+	/// 
+	/// # Safety
+	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// Lua ensures that the pointer is valid as long as the corresponding
 	/// userdata is alive. Moreover, if the userdata is marked for finalization,
 	/// it is valid at least until the call to its finalizer.
-	/// 
-	/// # Safety
-	/// The underlying Lua state may raise a memory [error](crate::errors).
 	#[inline(always)]
-	pub unsafe fn new_userdata_uv<'l>(
-		&'l self,
-		size: usize,
-		n_uservalues: c_ushort
-	) -> &'l mut [u8] {
-		let udata = unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues as _) };
-		from_raw_parts_mut(udata as *mut u8, size)
-	}
-
-	/// Similar to [`Thread::new_userdata_uv`], but do not create a slice.
-	/// 
-	/// You may use this function if you need to, for instance, cast the
-	/// resulting pointer to some other type `*mut T` for further usage.
-	/// 
-	/// # Safety
-	/// The underlying Lua state may raise a memory [error](crate::errors).
-	/// 
-	/// See also [`Thread::new_userdata_uv`] for lifetime specifications.
-	#[inline(always)]
-	pub unsafe fn new_userdata_uv_raw(
+	pub unsafe fn new_userdata_raw(
 		&self,
 		size: usize,
 		n_uservalues: c_ushort
@@ -590,23 +573,19 @@ impl Thread {
 		unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues as _) }
 	}
 
-	/// Similar to [`Thread::new_userdata_uv`], but takes an already existing
-	/// value and writes it to the allocated userdata.
-	/// 
-	/// This function does not give a finalizer for the userdata, so `T` must be
-	/// [`Copy`].
+	/// Similar to [`Thread::new_userdata_raw`], but take a type parameter `T`
+	/// to create a userdata of its size and return a `*mut T` pointer.
 	/// 
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
+	/// 
+	/// See also [`Thread::new_userdata_t`] for information on pointer validity.
 	#[inline(always)]
-	pub unsafe fn new_copy_t<'l, T: Copy>(
-		&'l self, value: T, n_uservalues: c_ushort
-	) -> &'l mut T {
-		let udata = unsafe { lua_newuserdatauv(
+	pub unsafe fn new_userdata_t<T>(&self, n_uservalues: c_ushort) -> *mut T {
+		let ptr = unsafe { lua_newuserdatauv(
 			self.as_ptr(), size_of::<T>(), n_uservalues as _
-		) } as *mut T;
-		unsafe { write(udata, value) };
-		unsafe { &mut *udata }
+		) };
+		ptr as *mut T
 	}
 	
 	/// Pop a key from the stack, and push a key–value pair from the table at
