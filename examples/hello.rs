@@ -1,9 +1,6 @@
 //! "Hello, world!" example running in Lua.
 
-use core::ffi::{
-	CStr,
-	c_int
-};
+use core::ffi::c_int;
 use lunka::prelude::*;
 
 unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
@@ -12,7 +9,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 
 	let is_ok = lua.load_string(
 		r#"print("Hello, world!")"#,
-		unsafe { CStr::from_bytes_with_nul_unchecked(b"=<embedded>\0") }
+		c"=<embedded>"
 	).is_ok();
 	if !is_ok {
 		let error = {

@@ -44,7 +44,7 @@ unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr_mut(l);
 
 	if let Some(msg) = lua.to_c_str(1) {
-		lua.traceback(&lua, Some(msg), 1);
+		lua.traceback(lua, Some(msg), 1);
 		return 1
 	}
 
@@ -71,7 +71,7 @@ unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
 	let base = lua.top();
 
 	let mut arguments = args().skip(1);
-	let load_status = if let Some(mut file_name) = arguments.nth(0) {
+	let load_status = if let Some(mut file_name) = arguments.next() {
 		lua.load_file(unsafe {
 			file_name.push('\0');
 			CStr::from_bytes_until_nul(file_name.as_bytes()).unwrap_unchecked()

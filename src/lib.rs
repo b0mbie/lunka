@@ -1,6 +1,7 @@
 //! `#![no_std]` bindings to Lua 5.4.
 
 #![no_std]
+#![allow(clippy::tabs_in_doc_comments)]
 
 // Important notes:
 // - Upvalues are presented as `int`s, however Lua uses them in `lu_byte`s.
@@ -115,13 +116,14 @@ pub enum GcMode {
 }
 
 /// Panic function that's similar to the panic function defined in `lauxlib.h`.
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
 pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
 	let msg = {
 		let msg_str = lua_tostring(l, -1);
 		if msg_str.is_null() {
-			CStr::from_bytes_with_nul_unchecked(
-				b"error object is not a string\0"
-			)
+			c"error object is not a string"
 		} else {
 			CStr::from_ptr(msg_str)
 		}
@@ -209,14 +211,14 @@ impl Drop for Lua {
 }
 
 impl AsRef<Thread> for Lua {
-	#[inline(always)]
+
 	fn as_ref(&self) -> &Thread {
 		self.thread
 	}
 }
 
 impl AsMut<Thread> for Lua {
-	#[inline(always)]
+
 	fn as_mut(&mut self) -> &mut Thread {
 		self.thread
 	}
@@ -224,22 +226,37 @@ impl AsMut<Thread> for Lua {
 
 impl Deref for Lua {
 	type Target = Thread;
-	#[inline(always)]
+
 	fn deref(&self) -> &Self::Target {
 		self.thread
 	}
 }
 
 impl DerefMut for Lua {
-	#[inline(always)]
+
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		self.thread
 	}
 }
 
 impl Lua {
-	#[inline(always)]
-	unsafe fn from_l(l: *mut State) -> Option<Self> {
+	/// Construct a new [`Lua`] using an already-allocated Lua state.
+	/// 
+	/// # Safety
+	/// `l` must be a valid pointer to a Lua state.
+	/// 
+	/// With this function, the [`Lua`] takes ownership of the Lua state.
+	/// You may not, for example, pass a coroutine pointer to this, as the
+	/// coroutine will not be owned by Rust code.
+	pub unsafe fn from_ptr(l: *mut State) -> Self {
+		let thread = Thread::from_ptr_mut(l);
+		Self {
+			thread
+		}
+	}
+
+
+	unsafe fn from_new_ptr(l: *mut State) -> Option<Self> {
 		if !l.is_null() {
 			let lua = Self {
 				thread: unsafe { Thread::from_ptr_mut(l) }
@@ -254,14 +271,10 @@ impl Lua {
 	/// 
 	/// Unlike [`Lua::try_new_auxlib`], this function never fails.
 	#[cfg(feature = "auxlib")]
-	#[inline(always)]
 	pub fn new_auxlib() -> Self {
-		match unsafe { Self::from_l(luaL_newstate()) } {
+		match unsafe { Self::from_new_ptr(luaL_newstate()) } {
 			Some(lua) => lua,
-			_ => panic!(concat!(
-				"not enough memory to create Lua state ",
-				"using the `lauxlib.h` allocator"
-			)),
+			_ => panic!("not enough memory to create Lua state using the `lauxlib.h` allocator"),
 		}
 	}
 
@@ -269,48 +282,40 @@ impl Lua {
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "auxlib")]
-	#[inline(always)]
 	pub fn try_new_auxlib() -> Option<Self> {
-		unsafe { Self::from_l(luaL_newstate()) }
+		unsafe { Self::from_new_ptr(luaL_newstate()) }
 	}
 
 	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
 	/// 
 	/// Unlike [`Lua::try_new_with_alloc_fn`], this function never fails.
-	#[inline(always)]
-	pub fn new_with_alloc_fn(
-		alloc_fn: Alloc, alloc_fn_data: *mut c_void
-	) -> Self {
-		match unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) } {
+	/// 
+	/// # Safety
+	/// `alloc_fn_data` must be valid to be passed to `alloc_fn`.
+	pub unsafe fn new_with_alloc_fn(alloc_fn: Alloc, alloc_fn_data: *mut c_void) -> Self {
+		match unsafe { Self::from_new_ptr(lua_newstate(alloc_fn, alloc_fn_data)) } {
 			Some(lua) => lua,
-			_ => panic!(concat!(
-				"not enough memory to create Lua state ",
-				"using a custom allocator function"
-			)),
+			_ => panic!("not enough memory to create Lua state using a custom allocator function"),
 		}
 	}
 
 	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
 	/// 
 	/// The function will return `None` if allocation failed.
-	#[inline(always)]
-	pub fn try_new_with_alloc_fn(
-		alloc_fn: Alloc, alloc_fn_data: *mut c_void
-	) -> Option<Self> {
-		unsafe { Self::from_l(lua_newstate(alloc_fn, alloc_fn_data)) }
+	/// 
+	/// # Safety
+	/// `alloc_fn_data` must be valid to be passed to `alloc_fn`.
+	pub unsafe fn try_new_with_alloc_fn(alloc_fn: Alloc, alloc_fn_data: *mut c_void) -> Option<Self> {
+		unsafe { Self::from_new_ptr(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
 	/// Construct a new [`Lua`] using the global Rust allocator.
 	/// 
 	/// Unlike [`Lua::try_new`], this function never fails.
-	#[inline(always)]
 	pub fn new() -> Self {
 		match Self::try_new() {
 			Some(lua) => lua,
-			_ => panic!(concat!(
-				"not enough memory to create Lua state ",
-				"using the global Rust allocator"
-			)),
+			_ => panic!("not enough memory to create Lua state using the global Rust allocator"),
 		}
 	}
 
@@ -382,7 +387,7 @@ impl Lua {
 		) -> *mut c_void {
 			let ptr = ptr as *mut u8;
 			if !ptr.is_null() {
-				if nsize <= 0 {
+				if nsize == 0 {
 					// FIXME: Once `allocator_api` is stabilized, use
 					// `Global.deallocate`.
 					dealloc(ptr, guess_layout(osize));
@@ -422,29 +427,10 @@ impl Lua {
 			}
 		}
 
-		unsafe { Self::from_l(lua_newstate(l_alloc, null_mut())) }
-	}
-
-	/// Construct a new [`Lua`] using an already-allocated Lua state, and set
-	/// its panic function to [`lua_panic_handler`].
-	/// 
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state.
-	/// 
-	/// With this function, the [`Lua`] takes ownership of the Lua state.
-	/// You may not, for example, pass a coroutine pointer to this, as the
-	/// coroutine will not be owned by Rust code.
-	#[inline(always)]
-	pub unsafe fn from_ptr(l: *mut State) -> Self {
-		let thread = Thread::from_ptr_mut(l);
-		thread.at_panic(Some(lua_panic_handler));
-		Self {
-			thread
-		}
+		unsafe { Self::from_new_ptr(lua_newstate(l_alloc, null_mut())) }
 	}
 
 	/// Return the raw pointer to the underlying Lua state.
-	#[inline(always)]
 	pub fn as_ptr(&self) -> *mut State {
 		self.thread.as_ptr()
 	}
@@ -463,36 +449,36 @@ pub struct Coroutine<'l> {
 	thread: &'l mut Thread,
 }
 
-impl<'l> AsRef<Thread> for Coroutine<'l> {
-	#[inline(always)]
+impl AsRef<Thread> for Coroutine<'_> {
+
 	fn as_ref(&self) -> &Thread {
 		self.thread
 	}
 }
 
-impl<'l> AsMut<Thread> for Coroutine<'l> {
-	#[inline(always)]
+impl AsMut<Thread> for Coroutine<'_> {
+
 	fn as_mut(&mut self) -> &mut Thread {
 		self.thread
 	}
 }
 
-impl<'l> Deref for Coroutine<'l> {
+impl Deref for Coroutine<'_> {
 	type Target = Thread;
-	#[inline(always)]
+
 	fn deref(&self) -> &Self::Target {
 		self.thread
 	}
 }
 
-impl<'l> DerefMut for Coroutine<'l> {
-	#[inline(always)]
+impl DerefMut for Coroutine<'_> {
+
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		self.thread
 	}
 }
 
-impl<'l> Coroutine<'l> {
+impl Coroutine<'_> {
 	/// Alias to [`Thread::close_as_coroutine`].
 	pub fn close(&mut self) -> Status {
 		self.thread.close_as_coroutine()
@@ -500,7 +486,7 @@ impl<'l> Coroutine<'l> {
 
 	/// Alias to [`Thread::close_as_coroutine_from`].
 	pub fn close_from(&mut self, from: &Self) -> Status {
-		self.thread.close_as_coroutine_from(&from.thread)
+		self.thread.close_as_coroutine_from(from.thread)
 	}
 }
 
@@ -518,8 +504,7 @@ impl<'l> Coroutine<'l> {
 /// There are no flags, widths, or precisions.
 /// The conversion specifiers can only be:
 /// - `%%` - insert the character `%`.
-/// - `%s` - insert a zero-terminated string using
-/// [`*const c_char`](core::ffi::c_char), with no size restrictions.
+/// - `%s` - insert a zero-terminated string using [`*const c_char`](core::ffi::c_char), with no size restrictions.
 /// - `%f` - insert a [`Number`].
 /// - `%I` - insert an [`Integer`].
 /// - `%p` - insert a *thin* pointer, like [`*mut c_void`](c_void).

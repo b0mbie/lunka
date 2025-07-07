@@ -4,41 +4,23 @@ use super::*;
 
 use core::ffi::CStr;
 
-pub const COROUTINE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"coroutine\0")
-};
+pub const COROUTINE_LIB_NAME: &CStr = c"coroutine";
 
-pub const TABLE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"table\0")
-};
+pub const TABLE_LIB_NAME: &CStr = c"table";
 
-pub const IO_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"io\0")
-};
+pub const IO_LIB_NAME: &CStr = c"io";
 
-pub const OS_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"os\0")
-};
+pub const OS_LIB_NAME: &CStr = c"os";
 
-pub const STRING_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"string\0")
-};
+pub const STRING_LIB_NAME: &CStr = c"string";
 
-pub const UTF8_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"utf8\0")
-};
+pub const UTF8_LIB_NAME: &CStr = c"utf8";
 
-pub const MATH_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"math\0")
-};
+pub const MATH_LIB_NAME: &CStr = c"math";
 
-pub const DEBUG_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"debug\0")
-};
+pub const DEBUG_LIB_NAME: &CStr = c"debug";
 
-pub const PACKAGE_LIB_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"package\0")
-};
+pub const PACKAGE_LIB_NAME: &CStr = c"package";
 
 #[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
 #[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]

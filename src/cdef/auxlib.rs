@@ -21,23 +21,17 @@ use core::{
 /// Global table name.
 /// 
 /// This cannot be changed for Lua that's already compiled.
-pub const GLOBAL_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"_G\0")
-};
+pub const GLOBAL_TABLE: &CStr = c"_G";
 
 /// Key, in the registry, for the table of loaded modules.
 /// 
 /// This cannot be changed for Lua that's already compiled.
-pub const LOADED_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"_LOADED\0")
-};
+pub const LOADED_TABLE: &CStr = c"_LOADED";
 
 /// Key, in the registry, for the table of preloaded loaders.
 /// 
 /// This cannot be changed for Lua that's already compiled.
-pub const PRELOAD_TABLE: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"_PRELOAD\0")
-};
+pub const PRELOAD_TABLE: &CStr = c"_PRELOAD";
 
 /// Type for arrays of functions to be registered by [`luaL_setfuncs`].
 /// Also known as `luaL_Reg`.
@@ -179,29 +173,36 @@ extern "C" {
 }
 
 /// Equivalent to the `luaL_checkversion` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_checkversion(l: *mut State) {
 	luaL_checkversion_(l, VERSION_NUM, NUM_SIZES)
 }
 
 /// Equivalent to the `luaL_loadfile` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `file_name` must be a valid C string.
 pub unsafe fn luaL_loadfile(l: *mut State, file_name: *const c_char) -> c_int {
 	luaL_loadfilex(l, file_name, null())
 }
 
 /// Functionally equivalent to the `luaL_newlibtable` C macro.
 /// 
-/// `lib` still has to be terminated with a sentinel pair - see [`Reg`].
-#[inline(always)]
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `lib` has to be terminated with a sentinel pair - see [`Reg`].
 pub unsafe fn luaL_newlibtable(l: *mut State, lib: &[Reg]) {
 	lua_createtable(l, 0, (lib.len() - 1) as _)
 }
 
 /// Functionally equivalent to the `luaL_newlib` C macro.
 /// 
-/// `lib` still has to be terminated with a sentinel pair - see [`Reg`].
-#[inline(always)]
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `lib` has to be terminated with a sentinel pair - see [`Reg`].
 pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
 	luaL_checkversion(l);
 	luaL_newlibtable(l, lib);
@@ -212,39 +213,52 @@ pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
 // useless. Maybe later.
 
 /// Equivalent to the `luaL_checkstring` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_checkstring(l: *mut State, arg: c_int) -> *const c_char {
 	luaL_checklstring(l, arg, null_mut())
 }
 
 /// Equivalent to the `luaL_optstring` C macro.
-#[inline(always)]
-pub unsafe fn luaL_optstring(
-	l: *mut State, arg: c_int, default: *const c_char
-) -> *const c_char {
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
+pub unsafe fn luaL_optstring(l: *mut State, arg: c_int, default: *const c_char) -> *const c_char {
 	luaL_optlstring(l, arg, default, null_mut())
 }
 
 /// Equivalent to the `luaL_typename` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_typename(l: *mut State, idx: c_int) -> *const c_char {
 	lua_typename(l, lua_type(l, idx))
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `file_name` must be a valid C string.
 pub unsafe fn luaL_dofile(l: *mut State, file_name: *const c_char) -> bool {
 	luaL_loadfile(l, file_name) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `code` must be a valid C string.
 pub unsafe fn luaL_dostring(l: *mut State, code: *const c_char) -> bool {
 	luaL_loadstring(l, code) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
 }
 
 /// Equivalent to the `luaL_getmetatable` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state,
+/// and `name` must be a valid C string.
 pub unsafe fn luaL_getmetatable(l: *mut State, name: *const c_char) -> c_int {
 	lua_getfield(l, REGISTRY_INDEX, name)
 }
@@ -252,7 +266,11 @@ pub unsafe fn luaL_getmetatable(l: *mut State, name: *const c_char) -> c_int {
 // `luaL_opt` omitted here because it can be written out easily.
 
 /// Equivalent to the `luaL_loadbuffer` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
+/// `buffer` must be the size of `buffer_sz`,
+/// and `name` must be a valid C string.
 pub unsafe fn luaL_loadbuffer(
 	l: *mut State,
 	buffer: *const c_char, buffer_sz: usize,
@@ -264,7 +282,9 @@ pub unsafe fn luaL_loadbuffer(
 // `luaL_intop` omitted here because it can be written out easily.
 
 /// Equivalent to the `luaL_pushfail` C macro.
-#[inline(always)]
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_pushfail(l: *mut State) {
 	lua_pushnil(l)
 }
@@ -294,7 +314,7 @@ pub struct Buffer<'l> {
 	_life: PhantomData<&'l *mut State>
 }
 
-impl<'l> Buffer<'l> {
+impl Buffer<'_> {
 	/// Construct an instance of [`Buffer`] that's zeroed, and put it inside of
 	/// [`MaybeUninit`] for future usage.
 	/// 
@@ -355,6 +375,11 @@ impl<'l> Buffer<'l> {
 	/// Equivalent to the C macro `luaL_bufflen`.
 	pub const fn len(&self) -> usize {
 		self.len
+	}
+
+	/// Return `true` if the buffer is empty.
+	pub const fn is_empty(&self) -> bool {
+		self.len == 0
 	}
 
 	/// Get the current capacity of the buffer.
@@ -426,7 +451,7 @@ impl<'l> Buffer<'l> {
 	}
 }
 
-impl<'l> Write for Buffer<'l> {
+impl Write for Buffer<'_> {
 	fn write_str(&mut self, s: &str) -> core::fmt::Result {
 		unsafe { self.add_chars(core::mem::transmute(s.as_bytes())) };
 		Ok(())

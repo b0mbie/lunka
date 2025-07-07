@@ -3,11 +3,9 @@
 use core::ffi::CStr;
 use lunka::prelude::*;
 
-const PRINT_CODE: &'static str = r#"print("Received arguments: ", ...)"#;
+const PRINT_CODE: &str = r#"print("Received arguments: ", ...)"#;
 
-const PRINT_CODE_LUA_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"=<embedded>\0")
-};
+const PRINT_CODE_LUA_NAME: &CStr = c"=<embedded>";
 
 trait Push<const N: usize> {
 	fn push_into(&self, thread: &LuaThread);
@@ -71,7 +69,7 @@ fn main() {
 	}
 
 	lua.push(4 as LuaInteger);
-	lua.push(3.14 as LuaNumber);
+	lua.push(3.1 as LuaNumber);
 	lua.push("how");
 
 	if !lua.run_managed(|mut mg| {

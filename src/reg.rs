@@ -33,6 +33,7 @@ impl<'name, const N: usize> Library<'name, N> {
 	) -> Self {
 		// SAFETY: We make an uninit `[Reg; N]`, but then immediately fill it
 		// with stuff without reading from it.
+		#[allow(clippy::uninit_assumed_init)]
 		let regs: [Reg; N] = unsafe {
 			let mut dest: [Reg; N] = MaybeUninit::uninit().assume_init();
 	
@@ -59,21 +60,22 @@ impl<'name, const N: usize> Library<'name, N> {
 	}
 
 	/// Return the number of functions registered.
-	#[inline(always)]
 	pub const fn n_regs() -> usize {
 		N
 	}
 
 	/// Return the number of functions registered, plus `1`.
-	#[inline(always)]
 	pub const fn n_regs_1() -> usize {
 		N + 1
 	}
 
 	/// Return the number of functions registered for this set of functions.
-	#[inline(always)]
 	pub const fn len(&self) -> usize {
 		Self::n_regs()
+	}
+
+	pub const fn is_empty(&self) -> bool {
+		Self::n_regs() == 0
 	}
 
 	/// Return a pointer to this structure to be used with C.
@@ -83,8 +85,6 @@ impl<'name, const N: usize> Library<'name, N> {
 
 	/// Return a slice of [`Reg`]s that represent the registered functions.
 	pub const fn as_reg_slice(&self) -> &[Reg] {
-		unsafe { from_raw_parts(
-			transmute(self as *const _ as *const Reg), N + 1
-		) }
+		unsafe { from_raw_parts(self as *const _ as *const Reg, N + 1) }
 	}
 }

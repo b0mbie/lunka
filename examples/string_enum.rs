@@ -37,7 +37,6 @@ unsafe impl LuaEnum<4> for SocketKind {
 		unsafe { c_str!("unix udp") },
 		unsafe { c_str!("unix tcp") },
 	]);
-	#[inline(always)]
 	unsafe fn from_index_unchecked(index: usize) -> Self {
 		match index {
 			0 => Self::Udp,
@@ -54,7 +53,6 @@ trait ThreadExt {
 }
 
 impl ThreadExt for LuaThread {
-	#[inline(always)]
 	unsafe fn check_enum<E: LuaEnum<N>, const N: usize>(&self, arg: c_int) -> E {
 		let index = self.check_option(arg, None, E::OPTIONS);
 		unsafe { E::from_index_unchecked(index) }

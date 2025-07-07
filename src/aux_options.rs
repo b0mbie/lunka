@@ -31,6 +31,7 @@ impl<'str, const N: usize> AuxOptions<'str, N> {
 	pub const fn new(items: [&'str CStr; N]) -> Self {
 		// SAFETY: We make an uninit `[*const c_char; N]`, but then immediately
 		// fill it with stuff without reading from it.
+		#[allow(clippy::uninit_assumed_init)]
 		let regs: [*const c_char; N] = unsafe {
 			let mut dest: [*const c_char; N] = MaybeUninit::uninit().assume_init();
 	
@@ -64,7 +65,7 @@ impl<'str, const N: usize> AuxOptions<'str, N> {
 	/// options contained within the structure.
 	pub const fn as_str_ptr_slice(&self) -> &[*const c_char] {
 		unsafe { from_raw_parts(
-			transmute(self as *const _ as *const c_char), N + 1
+			self as *const _ as *const *const c_char, N + 1
 		) }
 	}
 }

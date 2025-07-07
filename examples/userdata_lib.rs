@@ -32,7 +32,7 @@ impl Logger {
 #[repr(transparent)]
 struct LossyStrDisplay<'a>(pub &'a [u8]);
 
-impl<'a> Display for LossyStrDisplay<'a> {
+impl Display for LossyStrDisplay<'_> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
 		for chunk in self.0.utf8_chunks() {
 			f.write_str(chunk.valid())?;
@@ -45,9 +45,7 @@ impl<'a> Display for LossyStrDisplay<'a> {
 }
 
 /// Name of the metatable associated with [`Logger`].
-const LOGGER_MT_NAME: &'static CStr = unsafe {
-	CStr::from_bytes_with_nul_unchecked(b"Logger\0")
-};
+const LOGGER_MT_NAME: &CStr = c"Logger";
 /// Metatable for [`Logger`], which is responsible for method call support and
 /// proper garbage collection.
 const LOGGER_MT: LuaLibrary<2> = lua_library! {
@@ -116,7 +114,7 @@ unsafe extern "C" fn lua_main(l: *mut LuaState) -> c_int {
 
 	lua.run_managed(move |mut mg| {
 		mg.require(
-			unsafe { CStr::from_bytes_with_nul_unchecked(b"logging\0") },
+			c"logging",
 			luaopen_logging,
 			true
 		);
@@ -130,7 +128,7 @@ logger:info("Hello, world!")
 logger:set_tag("test (modified)")
 logger:info("Hello again!")
 		"#,
-		unsafe { CStr::from_bytes_with_nul_unchecked(b"=<embedded>\0") }
+		c"=<embedded>"
 	).is_ok() {
 		lua.error()
 	}
