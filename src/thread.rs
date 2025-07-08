@@ -535,6 +535,7 @@ impl Thread {
 	/// The returned pointer must only be used while it's valid.
 	/// 
 	/// Lua makes no guarantees about the alignment of the pointer.
+	/// It depends entirely on the allocator function used.
 	pub unsafe fn new_userdata_raw(
 		&self,
 		size: usize,

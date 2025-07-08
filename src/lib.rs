@@ -306,7 +306,8 @@ impl Lua {
 		unsafe { Self::from_new_ptr(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
-	/// Construct a new [`Lua`] using the global Rust allocator.
+	/// Construct a new [`Lua`] using the global Rust allocator,
+	/// aligning all allocations to the alignment of [`MaxAlign`].
 	/// 
 	/// Unlike [`Lua::try_new`], this function never fails.
 	pub fn new() -> Self {
@@ -316,67 +317,26 @@ impl Lua {
 		}
 	}
 
-	/// Construct a new [`Lua`] using the global Rust allocator.
+	/// Construct a new [`Lua`] using the global Rust allocator,
+	/// aligning all allocations to the alignment of [`MaxAlign`].
 	/// 
 	/// The function will return `None` if allocation failed.
 	#[cfg(feature = "alloc")]
 	pub fn try_new() -> Option<Self> {
 		use alloc::alloc::{
-			Layout,
-			alloc,
-			realloc,
-			dealloc,
+			Layout, alloc, realloc, dealloc,
 		};
-		use core::{
-			mem::align_of,
-			ptr::null_mut,
-		};
+		use core::ptr::null_mut;
 
-		#[cfg(target_pointer_width = "64")]
-		const fn guess_layout(size: usize) -> Layout {
-			const MASK: usize = core::mem::size_of::<usize>() - 1;
-			const { assert!(MASK == 7, "invalid mask") };
-			match size & MASK {
-				0 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<usize>()
-				) },
-				1 | 3 | 5 | 7 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<u8>()
-				) },
-				2 | 6 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<u16>()
-				) },
-				4 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<u32>()
-				) },
-				// SAFETY: The mask is in the range `0..=7`.
-				_ => unsafe { core::hint::unreachable_unchecked() }
+		fn guess_layout(size: usize) -> Option<Layout> {
+			if let Ok(layout) = Layout::from_size_align(size, align_of::<MaxAlign>()) {
+				Some(layout)
+			} else {
+				None
 			}
 		}
-		#[cfg(target_pointer_width = "32")]
-		const fn guess_layout(size: usize) -> Layout {
-			const MASK: usize = core::mem::size_of::<usize>() - 1;
-			const { assert!(MASK == 3, "invalid mask") };
-			match size & MASK {
-				0 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<usize>()
-				) },
-				1 | 3 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<u8>()
-				) },
-				2 => unsafe { Layout::from_size_align_unchecked(
-					size, align_of::<u16>()
-				) },
-				// SAFETY: The mask is in the range `0..=3`.
-				_ => unsafe { core::hint::unreachable_unchecked() }
-			}
-		}
-		#[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
-		const fn guess_layout(size: usize) -> Layout {
-			compile_error!("unsupported `usize` for platform")
-		}
 
-		// TODO: Is this right for emulating `malloc`?
+		// This should be OK for emulating the typical allocation routine used with Lua.
 		unsafe extern "C" fn l_alloc(
 			_ud: *mut c_void,
 			ptr: *mut c_void, osize: usize,
@@ -385,12 +345,16 @@ impl Lua {
 			let ptr = ptr as *mut u8;
 			if !ptr.is_null() {
 				if nsize == 0 {
-					// FIXME: Once `allocator_api` is stabilized, use
-					// `Global.deallocate`.
-					unsafe { dealloc(ptr, guess_layout(osize)) };
+					let Some(layout) = guess_layout(osize) else {
+						return null_mut()
+					};
+					// FIXME: Once `allocator_api` is stabilized, use `Global.deallocate`.
+					unsafe { dealloc(ptr, layout) };
 					null_mut()
 				} else {
-					let old_layout = guess_layout(osize);
+					let Some(old_layout) = guess_layout(osize) else {
+						return null_mut()
+					};
 
 					// FIXME: Once `allocator_api` is stabilized, use this.
 					/*
@@ -413,14 +377,16 @@ impl Lua {
 					*/
 					unsafe { realloc(ptr, old_layout, nsize) as *mut c_void }
 				}
-			} else {
-				unsafe { alloc(guess_layout(nsize)) as *mut c_void }
+			} else if let Some(layout) = guess_layout(nsize) {
 				// FIXME: Once `allocator_api` is stabilized, use this.
 				/*
 				Global.allocate(guess_layout(nsize))
 					.map(|ptr| (*ptr.as_ptr()).as_mut_ptr() as *mut c_void)
 					.unwrap_or(null_mut())
 				*/
+				unsafe { alloc(layout) as *mut c_void }
+			} else {
+				null_mut()
 			}
 		}
 

@@ -16,7 +16,7 @@
 
 use core::{
 	ffi::{
-		c_char, c_int, c_uchar, c_uint, c_ushort, c_void,
+		c_char, c_double, c_int, c_long, c_uchar, c_uint, c_ushort, c_void,
 	},
 	ptr::{
 		null_mut, null,
@@ -1129,4 +1129,15 @@ impl HookMask {
 			mask: self.mask | Self::INT_COUNT
 		}
 	}
+}
+
+/// Type that ensures maximum alignment for all of its fields.
+/// Referenced with `LUAI_MAXALIGN`.
+#[repr(C)]
+pub union MaxAlign {
+	pub n: Number,
+	pub u: c_double,
+	pub s: *mut c_void,
+	pub i: Integer,
+	pub l: c_long,
 }
