@@ -21,7 +21,7 @@ fn c_eprintln(data: &CStr) {
 
 fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 	if !status.is_ok() {
-		if let Some(message) = unsafe { lua.to_c_str(-1) } {
+		if let Some(message) = lua.to_c_str(-1) {
 			c_eprintln(message);
 		}
 		lua.run_managed(|mut mg| unsafe { mg.pop(1) });
@@ -32,14 +32,14 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 }
 
 unsafe extern "C-unwind" fn l_err_handler(l: *mut LuaState) -> c_int {
-	let lua = LuaThread::from_ptr_mut(l);
+	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 
 	if let Some(msg) = lua.to_c_str(1) {
 		lua.traceback(lua, Some(msg), 1);
 		return 1
 	}
 
-	let ok = lua.run_managed(|mut mg| {
+	let ok = lua.run_managed(|mut mg| unsafe {
 		mg.call_metamethod(1, c"__tostring")
 	});
 
@@ -47,16 +47,16 @@ unsafe extern "C-unwind" fn l_err_handler(l: *mut LuaState) -> c_int {
 		return 1
 	}
 
-	lua_push_fmt_string!(lua, "(error object is a %s value)", lua.type_name_of(1));
+	unsafe { lua_push_fmt_string!(lua, c"(error object is a %s value)", lua.type_name_of(1)) };
 
 	1
 }
 
 unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
-	let lua = LuaThread::from_ptr_mut(l);
+	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 
-	unsafe { lua.check_version() };
-	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
+	lua.check_version();
+	lua.run_managed(|mut mg| mg.open_libs());
 
 	lua.push_c_function(l_err_handler);
 	let base = lua.top();
@@ -77,13 +77,13 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 
 	let mut arg_count: c_uint = 0;
 	for arg in arguments {
-		unsafe { lua.push_string(arg.as_bytes()) };
+		lua.push_string(arg.as_bytes());
 		arg_count += 1;
 	}
 
 	let run_status = lua.run_managed(|mut mg| {
 		mg.restart_gc();
-		let run_status = mg.pcall(arg_count, 0, base);
+		let run_status = unsafe { mg.pcall(arg_count, 0, base) };
 		mg.stop_gc();
 		run_status
 	});
@@ -99,7 +99,7 @@ fn main() -> ExitCode {
 	let mut lua = Lua::new();
 
 	lua.push_c_function(l_main);
-	let status = lua.run_managed(|mut mg| mg.pcall(0, 1, 0));
+	let status = lua.run_managed(|mut mg| unsafe { mg.pcall(0, 1, 0) });
 	let is_ok = lua.to_boolean(-1);
 	report(&mut lua, status);
 

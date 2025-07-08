@@ -31,7 +31,7 @@ impl Push<1> for LuaNumber {
 
 impl Push<1> for &str {
 	fn push_into(&self, thread: &LuaThread) {
-		unsafe { thread.push_string(self.as_bytes()) };
+		thread.push_string(self.as_bytes());
 	}
 }
 
@@ -62,7 +62,7 @@ impl LuaThreadExt for LuaThread {
 
 fn main() {
 	let mut lua = Lua::new();
-	lua.run_managed(|mut mg| unsafe { mg.open_libs() });
+	lua.run_managed(|mut mg| mg.open_libs());
 
 	if !lua.load_string(PRINT_CODE.as_bytes(), PRINT_CODE_LUA_NAME).is_ok() {
 		panic!("couldn't load Lua chunk");
@@ -74,9 +74,9 @@ fn main() {
 
 	if !lua.run_managed(|mut mg| {
 		mg.restart_gc();
-		mg.pcall(3, 0, 0)
+		unsafe { mg.pcall(3, 0, 0) }
 	}).is_ok() {
-		let error_bytes = unsafe { lua.to_string(-1) };
+		let error_bytes = lua.to_string(-1);
 		panic!(
 			"error while running Lua chunk: {}",
 			error_bytes.map(String::from_utf8_lossy)

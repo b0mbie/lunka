@@ -9,7 +9,7 @@ use std::{
 };
 
 unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {	
-	let lua = LuaThread::from_ptr_mut(l);
+	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	let path = lua.check_string(1);
 	
 	let meta = match metadata(String::from_utf8_lossy(path).into_owned()) {

@@ -67,9 +67,12 @@ impl Managed<'_> {
 	/// This function follows the semantics of the corresponding Lua operator
 	/// (that is, it may call metamethods).
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 	/// from a metamethod.
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn arith(&mut self, operation: Arith) {
 		unsafe { lua_arith(self.l, operation as _) }
 	}
@@ -93,13 +96,13 @@ impl Managed<'_> {
 	/// first result is pushed first), so that after the call the last result is
 	/// on the top of the stack.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// Any [error](crate::errors) while calling and running the function is
 	/// propagated upwards (usually with a `longjmp`).
-	pub unsafe fn call(
-		&mut self,
-		n_args: c_uint, n_results: c_uint
-	) {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn call(&mut self, n_args: c_uint, n_results: c_uint) {
 		unsafe { lua_call(self.l, n_args as _, n_results as _) }
 	}
 
@@ -110,16 +113,16 @@ impl Managed<'_> {
 	/// function `continuation` will be called with the given context with
 	/// exactly the same Lua stack as it was observed before the yield.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// Any [error](crate::errors) while calling and running the function is
 	/// propagated upwards (usually with a `longjmp`).
 	/// 
-	/// Furthermore, yielding will also cause a jump, so all the aspects of
-	/// handling errors safely also apply here.
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn call_k(
 		&mut self,
 		n_args: c_uint, n_results: c_uint,
-		continuation: KFunction, context: KContext
+		continuation: KFunction, context: KContext,
 	) {
 		unsafe { lua_callk(
 			self.l,
@@ -132,9 +135,12 @@ impl Managed<'_> {
 	/// 
 	/// A `__close` metamethod cannot yield when called through this function.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 	/// from the `__close` metamethod.
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	/// 
 	/// The index must be the last index previously marked to be closed that is
 	/// still active (that is, not closed yet).
@@ -150,9 +156,12 @@ impl Managed<'_> {
 	/// Otherwise returns `false`.
 	/// Also returns `false` if any of the indices are not valid.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 	/// from a metamethod.
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn compare(
 		&mut self,
 		operation: Compare,
@@ -171,9 +180,12 @@ impl Managed<'_> {
 	/// 
 	/// Concatenation is performed following the usual semantics of Lua.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 	/// from a metamethod.
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn concat(&mut self, n: c_uint) {
 		unsafe { lua_concat(self.l, n as _) }
 	}
@@ -194,8 +206,11 @@ impl Managed<'_> {
 	/// 
 	/// As in Lua, this function may trigger a metamethod for the `index` event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn get_field(&mut self, obj_index: c_int, key: &CStr) -> Type {
 		unsafe { Type::from_c_int_unchecked(
 			lua_getfield(self.l, obj_index, key.as_ptr())
@@ -207,8 +222,11 @@ impl Managed<'_> {
 	/// 
 	/// As in Lua, this function may trigger a metamethod for the `index` event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn get_i(&mut self, obj_index: c_int, i: Integer) -> Type {
 		unsafe { Type::from_c_int_unchecked(lua_geti(self.l, obj_index, i)) }
 	}
@@ -222,8 +240,11 @@ impl Managed<'_> {
 	/// 
 	/// As in Lua, this function may trigger a metamethod for the `index` event. 
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn get_table(&mut self, obj_index: c_int) -> Type {
 		unsafe { Type::from_c_int_unchecked(lua_gettable(self.l, obj_index)) }
 	}
@@ -233,8 +254,11 @@ impl Managed<'_> {
 	/// This function is equivalent to the `#` operator in Lua and may trigger a
 	/// metamethod for the `length` event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn length_of(&mut self, index: c_int) {
 		unsafe { lua_len(self.l, index) }
 	}
@@ -309,7 +333,10 @@ impl Managed<'_> {
 	/// the error object, such as a stack traceback.
 	/// Such information cannot be gathered after the return of this function,
 	/// since by then the stack has unwound. 
-	pub fn pcall(
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn pcall(
 		&mut self,
 		n_args: c_uint, n_results: c_uint,
 		err_func: c_int
@@ -326,9 +353,11 @@ impl Managed<'_> {
 	/// function `continuation` will be called with the given context with
 	/// exactly the same Lua stack as it was observed before the yield.
 	/// 
+	/// # Errors
+	/// Yielding will cause a jump similar to an error (usually, with a `longjmp`).
+	/// 
 	/// # Safety
-	/// Yielding will cause a jump similar to an error (usually, with a `longjmp`),
-	/// so all the aspects of handling possible errors safely also apply here.
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn pcall_k(
 		&mut self,
 		n_args: c_uint, n_results: c_uint,
@@ -349,8 +378,11 @@ impl Managed<'_> {
 	/// also run arbitrary code when removing an index marked as to-be-closed
 	/// from the stack.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn pop(&mut self, n: c_uint) {
 		unsafe { lua_pop(self.l, n as _) }
 	}
@@ -365,8 +397,11 @@ impl Managed<'_> {
 	/// If `into_global` is true, also stores the module into the global
 	/// `module_name`.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn require(
 		&mut self,
 		module_name: &CStr,
@@ -389,8 +424,11 @@ impl Managed<'_> {
 	/// As in Lua, this function may trigger a metamethod for the `newindex`
 	/// event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn set_field(&mut self, obj_index: c_int, key: &CStr) {
 		unsafe { lua_setfield(self.l, obj_index, key.as_ptr()) }
 	}
@@ -404,8 +442,11 @@ impl Managed<'_> {
 	/// As in Lua, this function may trigger a metamethod for the `newindex`
 	/// event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn set_table(&mut self, obj_index: c_int) {
 		unsafe { lua_settable(self.l, obj_index) }
 	}
@@ -418,8 +459,11 @@ impl Managed<'_> {
 	/// This function can run arbitrary code when removing an index marked as
 	/// to-be-closed from the stack.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn set_top(&mut self, top: c_int) {
 		unsafe { lua_settop(self.l, top) }
 	}
@@ -432,8 +476,11 @@ impl Managed<'_> {
 	/// As in Lua, this function may trigger a metamethod for the `newindex`
 	/// event.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn set_i(&mut self, obj_index: c_int, i: Integer) {
 		unsafe { lua_seti(self.l, obj_index, i) }
 	}
@@ -443,9 +490,9 @@ impl Managed<'_> {
 impl Managed<'_> {
 	/// Open all standard Lua libraries into the associated Lua thread.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub unsafe fn open_libs(&mut self) {
+	pub fn open_libs(&mut self) {
 		unsafe { stdlibs::luaL_openlibs(self.l) }
 	}
 }
@@ -463,12 +510,12 @@ impl Managed<'_> {
 	/// If there is no metatable or no metamethod, this function returns `false`
 	/// without pushing any value on the stack. 
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub unsafe fn call_metamethod(
-		&mut self,
-		obj_index: c_int, event: &CStr
-	) -> bool {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn call_metamethod(&mut self, obj_index: c_int, event: &CStr) -> bool {
 		(unsafe { luaL_callmeta(
 			self.l,
 			obj_index, event.as_ptr()
@@ -477,9 +524,9 @@ impl Managed<'_> {
 
 	/// Load and run the given file.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub unsafe fn do_file(&mut self, file_name: &CStr) -> bool {
+	pub fn do_file(&mut self, file_name: &CStr) -> bool {
 		unsafe { luaL_dofile(self.l, file_name.as_ptr()) }
 	}
 
@@ -494,12 +541,12 @@ impl Managed<'_> {
 	/// This function returns `true` if it finds a previous table there and
 	/// `false` if it creates a new table.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub unsafe fn get_sub_table(
-		&mut self,
-		parent_index: c_int, table_name: &CStr
-	) -> bool {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn get_sub_table(&mut self, parent_index: c_int, table_name: &CStr) -> bool {
 		(unsafe { luaL_getsubtable(
 			self.l,
 			parent_index, table_name.as_ptr()
@@ -510,13 +557,13 @@ impl Managed<'_> {
 	/// 
 	/// This function is equivalent to the `#` operator in Lua.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an [error](crate::errors) if the
 	/// result of the operation is not an integer.
 	/// (This case can only happen through metamethods.)
 	/// 
 	/// It can also raise an error from a metamethod.
-	pub unsafe fn meta_length_of(&mut self, obj_index: c_int) -> Integer {
+	pub fn meta_length_of(&mut self, obj_index: c_int) -> Integer {
 		unsafe { luaL_len(self.l, obj_index) }
 	}
 
@@ -525,11 +572,12 @@ impl Managed<'_> {
 	/// 
 	/// This function works the same way as [`Managed::to_string_meta`].
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub unsafe fn to_c_chars_meta(
-		&mut self, index: c_int
-	) -> Option<&[c_char]> {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn to_c_chars_meta(&mut self, index: c_int) -> Option<&[c_char]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {
@@ -544,11 +592,9 @@ impl Managed<'_> {
 	/// 
 	/// This function works the same way as [`Managed::to_string_meta`].
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub unsafe fn to_c_str_meta(
-		&mut self, index: c_int
-	) -> Option<&CStr> {
+	pub fn to_c_str_meta(&mut self, index: c_int) -> Option<&CStr> {
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
 		if !str_ptr.is_null() {
 			Some(unsafe { CStr::from_ptr(str_ptr) })
@@ -566,11 +612,12 @@ impl Managed<'_> {
 	/// function calls the corresponding metamethod with the value as argument,
 	/// and uses the result of the call as its result.
 	/// 
-	/// # Safety
+	/// # Errors
 	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub unsafe fn to_string_meta(
-		&mut self, index: c_int
-	) -> Option<&[u8]> {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn to_string_meta(&mut self, index: c_int) -> Option<&[u8]> {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		if !str_ptr.is_null() {

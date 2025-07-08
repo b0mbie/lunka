@@ -1,9 +1,6 @@
 //! Representing enum values with strings in Lua.
 
-use core::ffi::{
-	CStr,
-	c_int
-};
+use core::ffi::c_int;
 use lunka::prelude::*;
 
 pub unsafe trait LuaEnum<const N: usize> {
@@ -19,23 +16,12 @@ enum SocketKind {
 	UnixTcp,
 }
 
-macro_rules! c_str {
-	($data:literal) => {
-		CStr::from_bytes_with_nul_unchecked(concat!($data, "\0").as_bytes())
-	};
-	($id:ident) => { unsafe {
-		CStr::from_bytes_with_nul_unchecked(
-			concat!(stringify!($id), "\0").as_bytes()
-		)
-	} };
-}
-
 unsafe impl LuaEnum<4> for SocketKind {
 	const OPTIONS: &'static LuaAuxOptions<'static, 4> = &LuaAuxOptions::new([
-		c_str!(udp),
-		c_str!(tcp),
-		unsafe { c_str!("unix udp") },
-		unsafe { c_str!("unix tcp") },
+		c"udp",
+		c"tcp",
+		c"unix udp",
+		c"unix tcp",
 	]);
 	unsafe fn from_index_unchecked(index: usize) -> Self {
 		match index {
@@ -43,17 +29,17 @@ unsafe impl LuaEnum<4> for SocketKind {
 			1 => Self::Tcp,
 			2 => Self::UnixUdp,
 			3 => Self::UnixTcp,
-			_ => core::hint::unreachable_unchecked(),
+			_ => ::core::hint::unreachable_unchecked(),
 		}
 	}
 }
 
 trait ThreadExt {
-	unsafe fn check_enum<E: LuaEnum<N>, const N: usize>(&self, arg: c_int) -> E;
+	fn check_enum<E: LuaEnum<N>, const N: usize>(&self, arg: c_int) -> E;
 }
 
 impl ThreadExt for LuaThread {
-	unsafe fn check_enum<E: LuaEnum<N>, const N: usize>(&self, arg: c_int) -> E {
+	fn check_enum<E: LuaEnum<N>, const N: usize>(&self, arg: c_int) -> E {
 		let index = self.check_option(arg, None, E::OPTIONS);
 		unsafe { E::from_index_unchecked(index) }
 	}
@@ -72,7 +58,7 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 		lua.run_managed(move |mut mg| {
 			mg.push_c_function(l_test);
 			mg.push_string(variant);
-			mg.call(1, 0)
+			unsafe { mg.call(1, 0) }
 		})
 	};
 	test(b"udp");
@@ -87,7 +73,7 @@ fn main() {
 	let mut lua = Lua::new();
 	let did_run_ok = lua.run_managed(move |mut mg| {
 		mg.push_c_function(l_main);
-		mg.pcall(0, 1, 0).is_ok()
+		unsafe { mg.pcall(0, 1, 0).is_ok() }
 	});
 	assert!(!did_run_ok, "test code should fail");
 }
