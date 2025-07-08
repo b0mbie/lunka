@@ -1,12 +1,12 @@
 //! See [`DebugWhat`].
 
-use core::ffi::c_char;
+use core::ffi::CStr;
 
 /// Structure for defining what information needs to be extracted from a
 /// function.
 /// 
 /// This is used in [`lua_getinfo`](crate::cdef::lua_getinfo) and
-/// [`Thread::get_info`](crate::thread::Thread::get_info).
+/// [`ThreadDebug::get_info`](crate::thread::ThreadDebug::get_info).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DebugWhat {
 	what_flags: u8,
@@ -41,50 +41,50 @@ impl DebugWhat {
 	/// 
 	/// The maximum number of C characters that can be written to `buffer` is
 	/// `10`, including the zero-terminator.
-	pub fn write_string<'a>(&self, buffer: &'a mut [c_char]) -> &'a [c_char] {
+	pub fn write_string<'a>(&self, buffer: &'a mut [u8]) -> &'a CStr {
 		let flags = self.what_flags;
 	
 		let mut i = 0;
 	
 		if self.using_function {
-			buffer[i] = b'>' as _;
+			buffer[i] = b'>';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_FUNC) {
-			buffer[i] = b'f' as _;
+			buffer[i] = b'f';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_CURRENT_LINE) {
-			buffer[i] = b'l' as _;
+			buffer[i] = b'l';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_NAME) {
-			buffer[i] = b'n' as _;
+			buffer[i] = b'n';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_TRANSFER) {
-			buffer[i] = b'r' as _;
+			buffer[i] = b'r';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_SOURCE) {
-			buffer[i] = b'S' as _;
+			buffer[i] = b'S';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_TAIL_CALL) {
-			buffer[i] = b't' as _;
+			buffer[i] = b't';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_PROTO) {
-			buffer[i] = b'u' as _;
+			buffer[i] = b'u';
 			i += 1;
 		}
 		if has_bit(flags, Self::FLAG_LINES) {
-			buffer[i] = b'L' as _;
+			buffer[i] = b'L';
 			i += 1;
 		}
 		buffer[i] = 0;
 
-		&buffer[0..=i]
+		unsafe { CStr::from_bytes_with_nul_unchecked(&buffer[0..=i]) }
 	}
 
 	/// Require function (push function onto the stack).
