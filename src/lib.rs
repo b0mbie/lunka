@@ -514,15 +514,10 @@ impl Coroutine<'_> {
 /// to be sufficient format arguments, and they must be of the correct type.
 #[macro_export]
 macro_rules! lua_push_fmt_string {
-	($lua:expr, $fmt:literal $(, $fmt_arg:expr)*) => {{
+	($lua:expr, $fmt:expr $(, $($fmt_arg:tt)*)?) => {{
 		let lua: &$crate::Thread = &$lua;
-		$crate::cdef::lua_pushfstring(
-			lua.as_ptr(),
-			core::ffi::CStr::from_bytes_with_nul_unchecked(
-				concat!($fmt, "\0").as_bytes()
-			).as_ptr()
-			$(, $fmt_arg)*
-		)
+		let fmt: &::core::ffi::CStr = $fmt;
+		$crate::cdef::lua_pushfstring(lua.as_ptr(), fmt.as_ptr()$(, $($fmt_arg)*)?)
 	}};
 }
 
@@ -629,7 +624,7 @@ macro_rules! lua_library {
 #[macro_export]
 macro_rules! lua_function {
 	($l:pat => $body:expr) => {{
-		unsafe extern "C-unwind" fn __lua_function_inner($l: *mut ::lunka::cdef::State) -> ::core::ffi::c_int {
+		unsafe extern "C-unwind" fn __lua_function_inner($l: *mut $crate::cdef::State) -> ::core::ffi::c_int {
 			$body
 		}
 		__lua_function_inner
