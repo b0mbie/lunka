@@ -16,10 +16,12 @@ use crate::{
 
 use core::{
 	ffi::{
-		c_char, c_int, c_uint, c_ushort, c_void, CStr
+		c_char, c_int, c_uint, c_ushort, c_void, CStr,
 	},
 	marker::PhantomData,
-	mem::size_of,
+	mem::{
+		size_of, transmute,
+	},
 	ptr::{
 		null, null_mut, NonNull
 	},
@@ -112,7 +114,7 @@ impl Thread {
 	/// `l` must point to a valid Lua state (`lua_State *` in C), for the
 	/// duration specified by `'a`.
 	pub unsafe fn from_ptr<'a>(l: *mut State) -> &'a Self {
-		&*(l as *mut Self)
+		unsafe { &*(l as *mut Self) }
 	}
 
 	/// Construct a _mutable_ reference to [`Thread`] from a raw C pointer to a
@@ -127,7 +129,7 @@ impl Thread {
 	/// may not be two `&mut Thread`s that point to the same state,
 	/// nor a `&Thread` and a `&mut Thread`.
 	pub unsafe fn from_ptr_mut<'a>(l: *mut State) -> &'a mut Self {
-		&mut *(l as *mut Self)
+		unsafe { &mut *(l as *mut Self) }
 	}
 
 	/// Return the raw C pointer that represents the underlying Lua state.
@@ -173,7 +175,7 @@ impl Thread {
 	/// This [`Thread`] must not be used for any further API calls, as the
 	/// underlying Lua pointer becomes invalid after this call.
 	pub unsafe fn close_as_main(&mut self) {
-		lua_close(self.as_ptr())
+		unsafe { lua_close(self.as_ptr()) }
 	}
 
 	/// Reset a thread, cleaning its call stack and closing all pending
@@ -1192,14 +1194,15 @@ impl Thread {
 		) };
 	}
 
-	/// Return the current hook function.
-	/// 
-	/// See also [`Hook`].
+	/// Returns a [`ThreadDebug`] structure that exposes various functions operating on [`Debug`] structures.
 	/// 
 	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn hook<const ID_SIZE: usize>(&self) -> Hook<ID_SIZE> {
-		unsafe { lua_gethook(self.as_ptr()) }
+	/// `ID_SIZE` must be the appropriate identifier size for the underlying Lua state.
+	/// See [`DEFAULT_ID_SIZE`] for the default.
+	pub const unsafe fn debug<const ID_SIZE: usize>(&self) -> ThreadDebug<'_, ID_SIZE> {
+		ThreadDebug {
+			thread: self,
+		}
 	}
 
 	/// Return the current hook count.
@@ -1212,83 +1215,6 @@ impl Thread {
 	/// See also [`HookMask`].
 	pub fn hook_mask(&self) -> HookMask {
 		unsafe { HookMask::from_c_int_unchecked(lua_gethookmask(self.as_ptr())) }
-	}
-
-	/// Gets information about a specific function or function invocation.
-	/// 
-	/// See also [`DebugWhat`](crate::dbg_what::DebugWhat) for generating `what`.
-	/// 
-	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn get_info<const ID_SIZE: usize>(
-		&self, what: &CStr, ar: &mut Debug<ID_SIZE>
-	) -> bool {
-		(unsafe { lua_getinfo(self.as_ptr(), what.as_ptr(), ar) }) != 0
-	}
-
-	/// Get information about a local variable or a temporary value of a given
-	/// activation record or function.
-	/// 
-	/// The function pushes the variable's value onto the stack and returns its
-	/// name.
-	/// It returns `None` (and pushes nothing) when the index is greater than
-	/// the number of active local variables. 
-	/// 
-	/// # Activation records
-	/// For activation records, the parameter `ar` must be a valid activation
-	/// record that was filled by a previous call to [`Thread::get_stack`] or
-	/// given as argument to a hook (see [`Hook`]).
-	/// The index `n` selects which local variable to inspect.
-	/// 
-	/// # Functions
-	/// For functions, `ar` must be `None` and the function to be inspected must
-	/// be on the top of the stack.
-	/// In this case, only parameters of Lua functions are visible (as there is
-	/// no information about what variables are active) and no values are pushed
-	/// onto the stack.
-	/// 
-	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn get_local<'dbg, const ID_SIZE: usize>(
-		&self,
-		ar: Option<&'dbg Debug<ID_SIZE>>, n: c_int
-	) -> Option<&'dbg CStr> {
-		let str_ptr = unsafe { lua_getlocal(
-			self.as_ptr(),
-			ar.map(|ar| ar as *const _).unwrap_or(null()),
-			n
-		) };
-
-		if !str_ptr.is_null() {
-			Some(unsafe { CStr::from_ptr(str_ptr) })
-		} else {
-			None
-		}
-	}
-
-	/// Get information about the interpreter runtime stack.
-	/// 
-	/// This function fills parts of a [`struct@Debug`] structure with an
-	/// identification of the activation record of the function executing at a
-	/// given level.
-	/// 
-	/// Level `0` is the current running function, whereas level `n + 1` is the
-	/// function that has called level `n` (except for tail calls, which do not
-	/// count in the stack).
-	/// When called with a level greater than the stack depth, this function
-	/// returns `None`.
-	/// 
-	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn get_stack<const ID_SIZE: usize>(
-		&self, level: c_int
-	) -> Option<Debug<ID_SIZE>> {
-		let mut ar = Debug::zeroed();
-		if unsafe { lua_getstack(self.as_ptr(), level, &mut ar) } != 0 {
-			Some(ar)
-		} else {
-			None
-		}
 	}
 
 	/// Get information about the `n`-th upvalue of the closure at index
@@ -1308,60 +1234,6 @@ impl Thread {
 		}
 	}
 
-	/// Set the debugging hook function.
-	/// 
-	/// `hook` is the hook function.
-	/// 
-	/// `mask` specifies on which events the hook will be called: it is formed
-	/// by [`HookMask`].
-	/// 
-	/// `count` is only meaningful when the mask includes the count hook
-	/// (with [`HookMask::with_instructions`]).
-	/// 
-	/// For each event, the hook is called as explained below:
-	/// - The **call** hook is called when the interpreter calls a function.
-	///   The hook is called just after Lua enters the new function.
-	/// - The **return** hook is called when the interpreter returns from a function.
-	///   The hook is called just before Lua leaves the function.
-	/// - The **line** hook is called when the interpreter is about to start the execution of a new line of code,
-	///   or when it jumps back in the code (even to the same line).
-	///   This event only happens while Lua is executing a Lua function.
-	/// - The **count** hook is called after the interpreter executes every `count` instructions.
-	///   This event only happens while Lua is executing a Lua function.
-	/// 
-	/// Hooks are disabled by supplying an empty `mask`.
-	/// 
-	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn set_hook<const ID_SIZE: usize>(
-		&self, hook: Hook<ID_SIZE>, mask: HookMask, count: c_int
-	) {
-		unsafe { lua_sethook(self.as_ptr(), hook, mask.into_c_int(), count) }
-	}
-
-	/// Set the value of a local variable of a given activation record and
-	/// return its name.
-	/// 
-	/// Returns `None` (and pops nothing) when the index is greater than the
-	/// number of active local variables. 
-	/// 
-	/// This function assigns the value on the top of the stack to the variable.
-	/// It also pops the value from the stack.
-	/// 
-	/// # Safety
-	/// `ID_SIZE` must be appropriate for this Lua thread.
-	pub unsafe fn set_local<'dbg, const ID_SIZE: usize>(
-		&self,
-		ar: &'dbg Debug<ID_SIZE>, n: c_int
-	) -> Option<&'dbg CStr> {
-		let str_ptr = unsafe { lua_setlocal(self.as_ptr(), ar, n) };
-		if !str_ptr.is_null() {
-			Some(unsafe { CStr::from_ptr(str_ptr) })
-		} else {
-			None
-		}
-	}
-
 	/// Set the value of a closure's upvalue and return its name.
 	/// 
 	/// Returns `None` (and pops nothing) when the index `n` is greater than the
@@ -1369,8 +1241,13 @@ impl Thread {
 	/// 
 	/// This function assigns the value on the top of the stack to the upvalue.
 	/// It also pops the value from the stack.
-	pub unsafe fn set_upvalue(&self, func_index: c_int, n: u8) -> &CStr {
-		unsafe { CStr::from_ptr(lua_setupvalue(self.as_ptr(), func_index, n as _)) }
+	pub fn set_upvalue(&self, func_index: c_int, n: u8) -> Option<&CStr> {
+		let name_ptr = unsafe { lua_setupvalue(self.as_ptr(), func_index, n as _) };
+		if !name_ptr.is_null() {
+			unsafe { Some(CStr::from_ptr(name_ptr)) }
+		} else {
+			None
+		}
 	}
 
 	/// Return a unique identifier for the upvalue numbered `n` from the closure
@@ -1958,5 +1835,139 @@ impl Thread {
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub unsafe fn where_string(&self, level: c_int) {
 		unsafe { luaL_where(self.as_ptr(), level) }
+	}
+}
+
+#[repr(transparent)]
+pub struct ThreadDebug<'a, const ID_SIZE: usize> {
+	thread: &'a Thread,
+}
+
+impl<const ID_SIZE: usize> ThreadDebug<'_, ID_SIZE> {
+	/// Return the current hook function.
+	/// 
+	/// See also [`Hook`].
+	pub fn hook_fn(&self) -> Hook<ID_SIZE> {
+		let hook_fn = unsafe { lua_gethook(self.thread.as_ptr()) };
+		unsafe { transmute(hook_fn) }
+	}
+
+	/// Gets information about a specific function or function invocation.
+	/// 
+	/// See also [`DebugWhat`](crate::dbg_what::DebugWhat) for generating `what`.
+	pub fn get_info(&self, what: &CStr, ar: &mut Debug<ID_SIZE>) -> bool {
+		(unsafe { lua_getinfo(self.thread.as_ptr(), what.as_ptr(), ar as *mut _ as *mut _) }) != 0
+	}
+
+	/// Get information about a local variable or a temporary value of a given
+	/// activation record or function.
+	/// 
+	/// The function pushes the variable's value onto the stack and returns its
+	/// name.
+	/// It returns `None` (and pushes nothing) when the index is greater than
+	/// the number of active local variables. 
+	/// 
+	/// # Activation records
+	/// For activation records, the parameter `ar` must be a valid activation
+	/// record that was filled by a previous call to [`Thread::get_stack`] or
+	/// given as argument to a hook (see [`Hook`]).
+	/// The index `n` selects which local variable to inspect.
+	/// 
+	/// # Functions
+	/// For functions, `ar` must be `None` and the function to be inspected must
+	/// be on the top of the stack.
+	/// In this case, only parameters of Lua functions are visible (as there is
+	/// no information about what variables are active) and no values are pushed
+	/// onto the stack.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
+	pub unsafe fn get_local<'dbg>(&self, ar: Option<&'dbg Debug<ID_SIZE>>, n: c_int) -> Option<&'dbg CStr> {
+		let str_ptr = unsafe { lua_getlocal(
+			self.thread.as_ptr(),
+			ar.map(|ar| ar as *const _ as *const _).unwrap_or(null()),
+			n
+		) };
+
+		if !str_ptr.is_null() {
+			Some(unsafe { CStr::from_ptr(str_ptr) })
+		} else {
+			None
+		}
+	}
+
+	/// Set the debugging hook function.
+	/// 
+	/// `hook` is the hook function.
+	/// 
+	/// `mask` specifies on which events the hook will be called: it is formed
+	/// by [`HookMask`].
+	/// 
+	/// `count` is only meaningful when the mask includes the count hook
+	/// (with [`HookMask::with_instructions`]).
+	/// 
+	/// For each event, the hook is called as explained below:
+	/// - The **call** hook is called when the interpreter calls a function.
+	///   The hook is called just after Lua enters the new function.
+	/// - The **return** hook is called when the interpreter returns from a function.
+	///   The hook is called just before Lua leaves the function.
+	/// - The **line** hook is called when the interpreter is about to start the execution of a new line of code,
+	///   or when it jumps back in the code (even to the same line).
+	///   This event only happens while Lua is executing a Lua function.
+	/// - The **count** hook is called after the interpreter executes every `count` instructions.
+	///   This event only happens while Lua is executing a Lua function.
+	/// 
+	/// Hooks are disabled by supplying an empty `mask`.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
+	pub unsafe fn set_hook_fn(
+		&self, hook_fn: Hook<ID_SIZE>, mask: HookMask, count: c_int,
+	) {
+		let hook_fn = unsafe { transmute::<Hook<ID_SIZE>, Hook<DEFAULT_ID_SIZE>>(hook_fn) };
+		unsafe { lua_sethook(self.thread.as_ptr(), hook_fn, mask.into_c_int(), count) }
+	}
+
+	/// Get information about the interpreter runtime stack.
+	/// 
+	/// This function fills parts of a [`struct@Debug`] structure with an
+	/// identification of the activation record of the function executing at a
+	/// given level.
+	/// 
+	/// Level `0` is the current running function, whereas level `n + 1` is the
+	/// function that has called level `n` (except for tail calls, which do not
+	/// count in the stack).
+	/// When called with a level greater than the stack depth, this function
+	/// returns `None`.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
+	pub unsafe fn get_stack(&self, level: c_int) -> Option<Debug<ID_SIZE>> {
+		let mut ar = Debug::<ID_SIZE>::zeroed();
+		if unsafe { lua_getstack(self.thread.as_ptr(), level, &mut ar as *mut _ as *mut _) } != 0 {
+			Some(ar)
+		} else {
+			None
+		}
+	}
+
+	/// Set the value of a local variable of a given activation record and
+	/// return its name.
+	/// 
+	/// Returns `None` (and pops nothing) when the index is greater than the
+	/// number of active local variables. 
+	/// 
+	/// This function assigns the value on the top of the stack to the variable.
+	/// It also pops the value from the stack.
+	/// 
+	/// # Safety
+	/// `ID_SIZE` must be appropriate for this Lua thread.
+	pub unsafe fn set_local<'dbg>(&self, ar: &'dbg Debug<ID_SIZE>, n: c_int) -> Option<&'dbg CStr> {
+		let str_ptr = unsafe { lua_setlocal(self.thread.as_ptr(), ar as *const _ as *const _, n) };
+		if !str_ptr.is_null() {
+			Some(unsafe { CStr::from_ptr(str_ptr) })
+		} else {
+			None
+		}
 	}
 }

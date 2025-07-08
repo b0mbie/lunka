@@ -4,27 +4,18 @@ use lunka::prelude::*;
 use std::{
 	env::args,
 	ffi::{
-		c_int,
-		c_uint,
-		CStr
+		CStr, c_int, c_uint,
 	},
 	io::{
 		stderr,
 		Write
 	},
-	mem::transmute,
 	process::ExitCode
 };
 
-macro_rules! cstr {
-	($data:literal) => {
-		CStr::from_bytes_with_nul_unchecked(concat!($data, "\0").as_bytes())
-	};
-}
-
 fn c_eprintln(data: &CStr) {
 	let mut out = stderr();
-	let _ = out.write_all(unsafe { transmute(data.to_bytes()) });
+	let _ = out.write_all(data.to_bytes());
 	let _ = out.write_all(b"\n");
 }
 
@@ -40,7 +31,7 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 	}
 }
 
-unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn l_err_handler(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr_mut(l);
 
 	if let Some(msg) = lua.to_c_str(1) {
@@ -49,7 +40,7 @@ unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 	}
 
 	let ok = lua.run_managed(|mut mg| {
-		mg.call_metamethod(1, cstr!("__tostring"))
+		mg.call_metamethod(1, c"__tostring")
 	});
 
 	if ok && lua.type_of(-1) == LuaType::String {
@@ -61,7 +52,7 @@ unsafe extern "C" fn l_err_handler(l: *mut LuaState) -> c_int {
 	1
 }
 
-unsafe extern "C" fn l_main(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr_mut(l);
 
 	unsafe { lua.check_version() };

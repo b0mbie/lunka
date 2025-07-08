@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use lunka::prelude::*;
 
-unsafe extern "C" fn l_hello(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn l_hello(l: *mut LuaState) -> c_int {
 	// SAFETY: Caller ensures `l` is valid.
 	let lua = unsafe { LuaThread::from_ptr(l) };
 
@@ -19,8 +19,8 @@ const LIBRARY: LuaLibrary<1> = lua_library! {
 	hello: l_hello
 };
 
-#[export_name = "luaopen_hello"]
-unsafe extern "C" fn luaopen_hello(l: *mut LuaState) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C-unwind" fn luaopen_hello(l: *mut LuaState) -> c_int {
 	// SAFETY: Caller ensures `l` is valid.
 	let lua = unsafe { LuaThread::from_ptr(l) };
 

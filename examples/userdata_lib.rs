@@ -79,7 +79,7 @@ const LOGGER_LIB: LuaLibrary<2> = lua_library! {
 	})
 };
 
-unsafe extern "C" fn luaopen_logging(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn luaopen_logging(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr(l);
 	lua.new_metatable(LOGGER_MT_NAME);
 	{
@@ -109,7 +109,7 @@ unsafe extern "C" fn luaopen_logging(l: *mut LuaState) -> c_int {
 	1
 }
 
-unsafe extern "C" fn lua_main(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn lua_main(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr_mut(l);
 
 	lua.run_managed(move |mut mg| {

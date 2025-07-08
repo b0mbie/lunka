@@ -120,16 +120,13 @@ pub enum GcMode {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
-	let msg = {
-		let msg_str = lua_tostring(l, -1);
-		if msg_str.is_null() {
-			c"error object is not a string"
-		} else {
-			CStr::from_ptr(msg_str)
-		}
+	let msg_ptr = unsafe { lua_tostring(l, -1) };
+	let msg = if !msg_ptr.is_null() {
+		let msg = unsafe { CStr::from_ptr(msg_ptr) };
+		msg.to_str().unwrap_or("error object does not contain valid UTF-8")
+	} else {
+		"error object is not a string"
 	};
-
-	let msg = msg.to_str().unwrap_or("error object does not contain valid UTF-8");
 	panic!("unprotected error in call to Lua API ({msg})")
 }
 
@@ -249,7 +246,7 @@ impl Lua {
 	/// You may not, for example, pass a coroutine pointer to this, as the
 	/// coroutine will not be owned by Rust code.
 	pub unsafe fn from_ptr(l: *mut State) -> Self {
-		let thread = Thread::from_ptr_mut(l);
+		let thread = unsafe { Thread::from_ptr_mut(l) };
 		Self {
 			thread
 		}
@@ -390,7 +387,7 @@ impl Lua {
 				if nsize == 0 {
 					// FIXME: Once `allocator_api` is stabilized, use
 					// `Global.deallocate`.
-					dealloc(ptr, guess_layout(osize));
+					unsafe { dealloc(ptr, guess_layout(osize)) };
 					null_mut()
 				} else {
 					let old_layout = guess_layout(osize);
@@ -414,10 +411,10 @@ impl Lua {
 						ptr
 					}
 					*/
-					realloc(ptr, old_layout, nsize) as *mut c_void
+					unsafe { realloc(ptr, old_layout, nsize) as *mut c_void }
 				}
 			} else {
-				alloc(guess_layout(nsize)) as *mut c_void
+				unsafe { alloc(guess_layout(nsize)) as *mut c_void }
 				// FIXME: Once `allocator_api` is stabilized, use this.
 				/*
 				Global.allocate(guess_layout(nsize))
@@ -566,7 +563,7 @@ macro_rules! lua_fmt_error {
 /// ```
 /// use lunka::prelude::*;
 /// 
-/// unsafe extern "C" fn l_get_pi(l: *mut LuaState) -> core::ffi::c_int {
+/// unsafe extern "C-unwind" fn l_get_pi(l: *mut LuaState) -> core::ffi::c_int {
 /// 	let lua = LuaThread::from_ptr(l);
 /// 	lua.push_number(3.14);
 /// 	1
@@ -592,13 +589,13 @@ macro_rules! lua_library {
 	};
 
 	(@field $field:ident $fn:expr) => {
-		(unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(
+		(unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(
 			concat!(stringify!($field), "\0").as_bytes()
 		) }, Some($fn))
 	};
 
 	(@field $field:ident) => {
-		(unsafe { core::ffi::CStr::from_bytes_with_nul_unchecked(
+		(unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(
 			concat!(stringify!($field), "\0").as_bytes()
 		) }, None)
 	};
@@ -615,7 +612,7 @@ macro_rules! lua_library {
 /// use lunka::prelude::*;
 /// 
 /// #[no_mangle]
-/// unsafe extern "C" fn luaopen_mylib(l: *mut LuaState) -> core::ffi::c_int {
+/// unsafe extern "C-unwind" fn luaopen_mylib(l: *mut LuaState) -> core::ffi::c_int {
 /// 	let lua = LuaThread::from_ptr(l);
 /// 	lua.new_lib(&lua_library! {
 /// 		sqr: lua_function!(l => {
@@ -632,9 +629,7 @@ macro_rules! lua_library {
 #[macro_export]
 macro_rules! lua_function {
 	($l:pat => $body:expr) => {{
-		unsafe extern "C" fn __lua_function_inner(
-			$l: *mut lunka::cdef::State
-		) -> core::ffi::c_int {
+		unsafe extern "C-unwind" fn __lua_function_inner($l: *mut ::lunka::cdef::State) -> ::core::ffi::c_int {
 			$body
 		}
 		__lua_function_inner

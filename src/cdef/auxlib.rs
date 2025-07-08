@@ -6,16 +6,17 @@ use super::*;
 
 use core::{
 	ffi::CStr,
-	fmt::Write,
+	fmt,
 	marker::PhantomData,
 	mem::{
-		MaybeUninit,
-		size_of
+		MaybeUninit, size_of,
 	},
 	ptr::{
-		null, null_mut
+		null, null_mut,
 	},
-	slice::from_raw_parts_mut,
+	slice::{
+		from_raw_parts, from_raw_parts_mut,
+	},
 };
 
 /// Global table name.
@@ -62,7 +63,7 @@ pub const REF_NIL: c_int = -1;
 #[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
 #[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
 #[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
-extern "C" {
+unsafe extern "C-unwind" {
 	pub fn luaL_newstate() -> *mut State;
 
 	pub fn luaL_prepbuffsize(buffer: *mut Buffer, size: usize) -> *mut c_char;
@@ -177,7 +178,7 @@ extern "C" {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_checkversion(l: *mut State) {
-	luaL_checkversion_(l, VERSION_NUM, NUM_SIZES)
+	unsafe { luaL_checkversion_(l, VERSION_NUM, NUM_SIZES) }
 }
 
 /// Equivalent to the `luaL_loadfile` C macro.
@@ -186,7 +187,7 @@ pub unsafe fn luaL_checkversion(l: *mut State) {
 /// `l` must be a valid pointer to a Lua state,
 /// and `file_name` must be a valid C string.
 pub unsafe fn luaL_loadfile(l: *mut State, file_name: *const c_char) -> c_int {
-	luaL_loadfilex(l, file_name, null())
+	unsafe { luaL_loadfilex(l, file_name, null()) }
 }
 
 /// Functionally equivalent to the `luaL_newlibtable` C macro.
@@ -195,7 +196,7 @@ pub unsafe fn luaL_loadfile(l: *mut State, file_name: *const c_char) -> c_int {
 /// `l` must be a valid pointer to a Lua state,
 /// and `lib` has to be terminated with a sentinel pair - see [`Reg`].
 pub unsafe fn luaL_newlibtable(l: *mut State, lib: &[Reg]) {
-	lua_createtable(l, 0, (lib.len() - 1) as _)
+	unsafe { lua_createtable(l, 0, (lib.len() - 1) as _) }
 }
 
 /// Functionally equivalent to the `luaL_newlib` C macro.
@@ -204,9 +205,11 @@ pub unsafe fn luaL_newlibtable(l: *mut State, lib: &[Reg]) {
 /// `l` must be a valid pointer to a Lua state,
 /// and `lib` has to be terminated with a sentinel pair - see [`Reg`].
 pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
-	luaL_checkversion(l);
-	luaL_newlibtable(l, lib);
-	luaL_setfuncs(l, lib.as_ptr(), 0);
+	unsafe {
+		luaL_checkversion(l);
+		luaL_newlibtable(l, lib);
+		luaL_setfuncs(l, lib.as_ptr(), 0)
+	}
 }
 
 // `luaL_argcheck` and `luaL_argexpected` omitted here because they're kind of
@@ -217,7 +220,7 @@ pub unsafe fn luaL_newlib(l: *mut State, lib: &[Reg]) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_checkstring(l: *mut State, arg: c_int) -> *const c_char {
-	luaL_checklstring(l, arg, null_mut())
+	unsafe { luaL_checklstring(l, arg, null_mut()) }
 }
 
 /// Equivalent to the `luaL_optstring` C macro.
@@ -225,7 +228,7 @@ pub unsafe fn luaL_checkstring(l: *mut State, arg: c_int) -> *const c_char {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_optstring(l: *mut State, arg: c_int, default: *const c_char) -> *const c_char {
-	luaL_optlstring(l, arg, default, null_mut())
+	unsafe { luaL_optlstring(l, arg, default, null_mut()) }
 }
 
 /// Equivalent to the `luaL_typename` C macro.
@@ -233,7 +236,7 @@ pub unsafe fn luaL_optstring(l: *mut State, arg: c_int, default: *const c_char) 
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_typename(l: *mut State, idx: c_int) -> *const c_char {
-	lua_typename(l, lua_type(l, idx))
+	unsafe { lua_typename(l, lua_type(l, idx)) }
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
@@ -242,7 +245,7 @@ pub unsafe fn luaL_typename(l: *mut State, idx: c_int) -> *const c_char {
 /// `l` must be a valid pointer to a Lua state,
 /// and `file_name` must be a valid C string.
 pub unsafe fn luaL_dofile(l: *mut State, file_name: *const c_char) -> bool {
-	luaL_loadfile(l, file_name) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
+	unsafe { luaL_loadfile(l, file_name) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0 }
 }
 
 /// Equivalent to the `luaL_dofile` C macro.
@@ -251,7 +254,7 @@ pub unsafe fn luaL_dofile(l: *mut State, file_name: *const c_char) -> bool {
 /// `l` must be a valid pointer to a Lua state,
 /// and `code` must be a valid C string.
 pub unsafe fn luaL_dostring(l: *mut State, code: *const c_char) -> bool {
-	luaL_loadstring(l, code) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0
+	unsafe { luaL_loadstring(l, code) != 0 || lua_pcall(l, 0, MULT_RET, 0) != 0 }
 }
 
 /// Equivalent to the `luaL_getmetatable` C macro.
@@ -260,7 +263,7 @@ pub unsafe fn luaL_dostring(l: *mut State, code: *const c_char) -> bool {
 /// `l` must be a valid pointer to a Lua state,
 /// and `name` must be a valid C string.
 pub unsafe fn luaL_getmetatable(l: *mut State, name: *const c_char) -> c_int {
-	lua_getfield(l, REGISTRY_INDEX, name)
+	unsafe { lua_getfield(l, REGISTRY_INDEX, name) }
 }
 
 // `luaL_opt` omitted here because it can be written out easily.
@@ -276,7 +279,7 @@ pub unsafe fn luaL_loadbuffer(
 	buffer: *const c_char, buffer_sz: usize,
 	name: *const c_char
 ) -> c_int {
-	luaL_loadbufferx(l, buffer, buffer_sz, name, null())
+	unsafe { luaL_loadbufferx(l, buffer, buffer_sz, name, null()) }
 }
 
 // `luaL_intop` omitted here because it can be written out easily.
@@ -286,7 +289,7 @@ pub unsafe fn luaL_loadbuffer(
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn luaL_pushfail(l: *mut State) {
-	lua_pushnil(l)
+	unsafe { lua_pushnil(l) }
 }
 
 /// Initial buffer size used by the buffer system, for [`Buffer`].
@@ -367,7 +370,7 @@ impl Buffer<'_> {
 	/// # Safety
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub unsafe fn prep_default_with(&mut self, func: impl FnOnce(&mut [c_char])) {
-		self.prep_with(BUFFER_SIZE, func)
+		unsafe { self.prep_with(BUFFER_SIZE, func) }
 	}
 
 	/// Get the current length of the buffer.
@@ -451,16 +454,23 @@ impl Buffer<'_> {
 	}
 }
 
-impl Write for Buffer<'_> {
-	fn write_str(&mut self, s: &str) -> core::fmt::Result {
-		unsafe { self.add_chars(core::mem::transmute(s.as_bytes())) };
+const fn bytes_to_c_chars(b: &[u8]) -> &[c_char] {
+	unsafe { from_raw_parts(
+		b.as_ptr() as *const c_char,
+		b.len() * size_of::<u8>() / size_of::<c_char>(),
+	) }
+}
+
+impl fmt::Write for Buffer<'_> {
+	fn write_str(&mut self, s: &str) -> fmt::Result {
+		unsafe { self.add_chars(bytes_to_c_chars(s.as_bytes())) };
 		Ok(())
 	}
 
-	fn write_char(&mut self, c: char) -> core::fmt::Result {
+	fn write_char(&mut self, c: char) -> fmt::Result {
 		let mut char_data = [0u8; 4];
 		c.encode_utf8(&mut char_data);
-		unsafe { self.add_chars(core::mem::transmute(&char_data as &[u8])) };
+		unsafe { self.add_chars(bytes_to_c_chars(&char_data as &[u8])) };
 		Ok(())
 	}
 }

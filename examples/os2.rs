@@ -3,22 +3,12 @@
 
 use lunka::prelude::*;
 use std::{
-	ffi::{
-		c_int, CStr
-	},
+	ffi::c_int,
 	fmt::Write,
 	fs::metadata, time::SystemTime,
 };
 
-macro_rules! c_str {
-	($ident:ident) => {
-		unsafe { CStr::from_bytes_with_nul_unchecked(
-			concat!(stringify!($ident), "\0").as_bytes()
-		) }
-	};
-}
-
-unsafe extern "C" fn l_metadata(l: *mut LuaState) -> c_int {	
+unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {	
 	let lua = LuaThread::from_ptr_mut(l);
 	let path = lua.check_string(1);
 	
@@ -45,15 +35,15 @@ unsafe extern "C" fn l_metadata(l: *mut LuaState) -> c_int {
 		} else {
 			"other"
 		}.as_bytes());
-		mg.set_field(-2, c_str!(type));
+		mg.set_field(-2, c"type");
 
 		mg.push_integer(meta.len() as _);
-		mg.set_field(-2, c_str!(len));
+		mg.set_field(-2, c"len");
 
 		if let Ok(time) = meta.modified() {
 			if let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
 				mg.push_number(time.as_secs_f64());
-				mg.set_field(-2, c_str!(modified));
+				mg.set_field(-2, c"modified");
 			}
 		}
 	});
@@ -65,7 +55,7 @@ const LIBRARY: LuaLibrary<1> = lua_library! {
 	metadata: l_metadata
 };
 
-#[export_name = "luaopen_os2"]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn luaopen_os2(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr(l);
 	lua.new_lib(&LIBRARY);

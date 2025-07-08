@@ -16,17 +16,10 @@
 
 use core::{
 	ffi::{
-		c_char,
-		c_int,
-		c_uchar,
-		c_uint,
-		c_ushort,
-		c_void
+		c_char, c_int, c_uchar, c_uint, c_ushort, c_void,
 	},
-	mem::transmute,
 	ptr::{
-		null_mut,
-		null,
+		null_mut, null,
 	},
 };
 
@@ -182,7 +175,7 @@ macro_rules! c_int_enum {
 			pub const unsafe fn from_c_int_unchecked(value: c_int) -> Self {
 				match value {
 					$($def => Self::$variant,)*
-					_ => core::hint::unreachable_unchecked()
+					_ => unsafe { ::core::hint::unreachable_unchecked() }
 				}
 			}
 		}
@@ -373,7 +366,7 @@ pub struct State {
 /// Lua are used after a call to
 /// [`Thread::run_managed_no_gc`](crate::Thread::run_managed_no_gc)), then
 /// garbage collection must be manually stopped.
-pub type CFunction = unsafe extern "C" fn (l: *mut State) -> c_int;
+pub type CFunction = unsafe extern "C-unwind" fn(l: *mut State) -> c_int;
 
 /// Continuation function.
 /// Also known as `lua_KFunction`.
@@ -494,7 +487,7 @@ impl<const ID_SIZE: usize> Debug<ID_SIZE> {
 /// 
 /// The exact signature of this function depends on the size of
 /// `activation_record` behind a pointer - see [`struct@Debug`].
-pub type Hook<const ID_SIZE: usize = DEFAULT_ID_SIZE> = unsafe extern "C" fn (
+pub type Hook<const ID_SIZE: usize = DEFAULT_ID_SIZE> = unsafe extern "C-unwind" fn (
 	l: *mut State, activation_record: *mut Debug<ID_SIZE>
 );
 
@@ -576,7 +569,7 @@ pub(crate) use lua_state_func;
 #[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
 #[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
 #[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
-extern "C" {
+unsafe extern "C-unwind" {
 	pub fn lua_newstate(f: Alloc, ud: *mut c_void) -> *mut State;
 	pub fn lua_close(l: *mut State);
 
@@ -787,138 +780,22 @@ extern "C" {
 		pub fn lua_gethookcount(self) -> c_int;
 	
 		pub fn lua_setcstacklimit(self, limit: c_uint) -> c_int;
+
+		pub fn lua_getstack(self, level: c_int, ar: *mut Debug<DEFAULT_ID_SIZE>) -> c_int;
+		pub fn lua_getinfo(self, what: *const c_char, ar: *mut Debug<DEFAULT_ID_SIZE>) -> c_int;
+		pub fn lua_getlocal(self, ar: *const Debug<DEFAULT_ID_SIZE>, n: c_int) -> *const c_char;
+		pub fn lua_setlocal(self, ar: *const Debug<DEFAULT_ID_SIZE>, n: c_int) -> *const c_char;
+		pub fn lua_sethook(self, func: Hook<DEFAULT_ID_SIZE>, mask: c_int, count: c_int);
+		pub fn lua_gethook(self) -> Hook<DEFAULT_ID_SIZE>;
 	}
-
-	// These are used internally for Rust functions which can accept a const
-	// generic `ID_SIZE`.
-
-	#[link_name = "lua_getstack"]
-	fn lua_getstack_(
-		l: *mut State, level: c_int, ar: *mut Debug<DEFAULT_ID_SIZE>
-	) -> c_int;
-
-	#[link_name = "lua_getinfo"]
-	fn lua_getinfo_(
-		l: *mut State, what: *const c_char, ar: *mut Debug<DEFAULT_ID_SIZE>
-	) -> c_int;
-
-	#[link_name = "lua_getlocal"]
-	fn lua_getlocal_(
-		l: *mut State, ar: *const Debug<DEFAULT_ID_SIZE>, n: c_int
-	) -> *const c_char;
-
-	#[link_name = "lua_setlocal"]
-	fn lua_setlocal_(
-		l: *mut State, ar: *const Debug<DEFAULT_ID_SIZE>, n: c_int
-	) -> *const c_char;
-
-	#[link_name = "lua_sethook"]
-	fn lua_sethook_(
-		l: *mut State, func: Hook<DEFAULT_ID_SIZE>, mask: c_int, count: c_int
-	);
-	#[link_name = "lua_gethook"]
-	fn lua_gethook_(l: *mut State) -> Hook<DEFAULT_ID_SIZE>;
 }
-
-macro_rules! genericize_fn {
-	(
-		fn $link_fn:ident<$($gen_src:ident)+> for <$($gen_value:ident)+>
-		$(#[$attr:meta])*
-		as $vis:vis fn $name:ident[$($gen:tt)+](
-			$($param_n:ident : $param_ty:ty),*
-		)
-		$( -> $ret:ty )?
-	) => {
-		/// Equivalent to the API function of the same name, but it can accept
-		/// generic parameters.
-		$(#[$attr])*
-		$vis unsafe fn $name<$($gen)+>(
-			$($param_n : $param_ty),*
-		) $( -> $ret )? {
-			type ApiFn<$($gen)+> = unsafe extern "C" fn (
-				$($param_n : $param_ty),*
-			) $( -> $ret )?;
-
-			let target_fn: ApiFn<$($gen_value)+> = transmute(
-				$link_fn as ApiFn<$($gen_src)+>
-			);
-
-			target_fn($($param_n),*)
-		}
-	};
-}
-
-genericize_fn!(
-	fn lua_getstack_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// `ID_SIZE` must be valid for the Lua state,
-	/// `what` must be a valid C string,
-	/// and `ar` must be a valid pointer to a [`Debug`] structure.
-	as pub fn lua_getstack[const ID_SIZE: usize](
-		l: *mut State, level: c_int, ar: *mut Debug<ID_SIZE>
-	) -> c_int
-);
-
-genericize_fn!(
-	fn lua_getinfo_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// `ID_SIZE` must be valid for the Lua state,
-	/// `what` must be a valid C string,
-	/// and `ar` must be a valid pointer to a [`Debug`] structure.
-	as pub fn lua_getinfo[const ID_SIZE: usize](
-		l: *mut State, what: *const c_char, ar: *mut Debug<ID_SIZE>
-	) -> c_int
-);
-
-genericize_fn!(
-	fn lua_getlocal_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// `ID_SIZE` must be valid for the Lua state,
-	/// and `ar` must be a valid pointer to a [`Debug`] structure.
-	as pub fn lua_getlocal[const ID_SIZE: usize](
-		l: *mut State, ar: *const Debug<ID_SIZE>, n: c_int
-	) -> *const c_char
-);
-
-genericize_fn!(
-	fn lua_setlocal_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// `ID_SIZE` must be valid for the Lua state,
-	/// and `ar` must be a valid pointer to a [`Debug`] structure.
-	as pub fn lua_setlocal[const ID_SIZE: usize](
-		l: *mut State, ar: *const Debug<ID_SIZE>, n: c_int
-	) -> *const c_char
-);
-
-genericize_fn!(
-	fn lua_sethook_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// `ID_SIZE` must be valid for the Lua state,
-	/// and `ar` must be a valid pointer to a [`Debug`] structure.
-	as pub fn lua_sethook[const ID_SIZE: usize](
-		l: *mut State, func: Hook<ID_SIZE>, mask: c_int, count: c_int
-	)
-);
-
-genericize_fn!(
-	fn lua_gethook_<DEFAULT_ID_SIZE> for <ID_SIZE>
-	/// # Safety
-	/// `l` must be a valid pointer to a Lua state,
-	/// and `ID_SIZE` must be valid for the Lua state.
-	as pub fn lua_gethook[const ID_SIZE: usize](l: *mut State) -> Hook<ID_SIZE>
-);
 
 /// Equivalent to the `lua_call` C macro.
 /// 
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_call(l: *mut State, n_args: c_int, n_results: c_int) {
-	lua_callk(l, n_args, n_results, 0, None)
+	unsafe { lua_callk(l, n_args, n_results, 0, None) }
 }
 
 /// Equivalent to the `lua_pcall` C macro.
@@ -930,7 +807,7 @@ pub unsafe fn lua_pcall(
 	n_args: c_int, n_results: c_int,
 	err_func: c_int
 ) -> c_int {
-	lua_pcallk(l, n_args, n_results, err_func, 0, None)
+	unsafe { lua_pcallk(l, n_args, n_results, err_func, 0, None) }
 }
 
 /// *Almost* equivalent to the `lua_yield` C macro, however this function
@@ -939,7 +816,7 @@ pub unsafe fn lua_pcall(
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_yield(l: *mut State, n_results: c_int) -> ! {
-	lua_yieldk(l, n_results, 0, None)
+	unsafe { lua_yieldk(l, n_results, 0, None) }
 }
 
 /// *Almost* equivalent to the `lua_yield` C macro, however this function
@@ -948,7 +825,7 @@ pub unsafe fn lua_yield(l: *mut State, n_results: c_int) -> ! {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_yield_in_hook(l: *mut State, n_results: c_int) -> c_int {
-	lua_yieldk_in_hook(l, n_results, 0, None)
+	unsafe { lua_yieldk_in_hook(l, n_results, 0, None) }
 }
 
 /// Get a pointer to the extra space of a Lua state.
@@ -964,7 +841,7 @@ pub unsafe fn lua_yield_in_hook(l: *mut State, n_results: c_int) -> c_int {
 /// and `extra_space` must be valid for it.
 /// The returned pointer will point to completely arbitrary data that can change at any point.
 pub const unsafe fn lua_getextraspace(l: *mut State, extra_space: usize) -> *mut c_void {
-	l.byte_sub(extra_space) as *mut c_void
+	unsafe { l.byte_sub(extra_space) as *mut c_void }
 }
 
 /// Equivalent to the `lua_tonumber` C macro.
@@ -972,7 +849,7 @@ pub const unsafe fn lua_getextraspace(l: *mut State, extra_space: usize) -> *mut
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_tonumber(l: *mut State, idx: c_int) -> Number {
-	lua_tonumberx(l, idx, null_mut())
+	unsafe { lua_tonumberx(l, idx, null_mut()) }
 }
 
 /// Equivalent to the `lua_tointeger` C macro.
@@ -980,7 +857,7 @@ pub unsafe fn lua_tonumber(l: *mut State, idx: c_int) -> Number {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_tointeger(l: *mut State, idx: c_int) -> Integer {
-	lua_tointegerx(l, idx, null_mut())
+	unsafe { lua_tointegerx(l, idx, null_mut()) }
 }
 
 /// Equivalent to the `lua_pop` C macro.
@@ -988,7 +865,7 @@ pub unsafe fn lua_tointeger(l: *mut State, idx: c_int) -> Integer {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_pop(l: *mut State, n: c_int) {
-	lua_settop(l, -n - 1)
+	unsafe { lua_settop(l, -n - 1) }
 }
 
 /// Equivalent to the `lua_newtable` C macro.
@@ -996,7 +873,7 @@ pub unsafe fn lua_pop(l: *mut State, n: c_int) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_newtable(l: *mut State) {
-	lua_createtable(l, 0, 0)
+	unsafe { lua_createtable(l, 0, 0) }
 }
 
 /// Equivalent to the `lua_pushcfunction` C macro.
@@ -1004,7 +881,7 @@ pub unsafe fn lua_newtable(l: *mut State) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_pushcfunction(l: *mut State, func: CFunction) {
-	lua_pushcclosure(l, func, 0)
+	unsafe { lua_pushcclosure(l, func, 0) }
 }
 
 /// Equivalent to the `lua_register` C macro.
@@ -1013,8 +890,10 @@ pub unsafe fn lua_pushcfunction(l: *mut State, func: CFunction) {
 /// `l` must be a valid pointer to a Lua state,
 /// and `name` must be a valid C string.
 pub unsafe fn lua_register(l: *mut State, name: *const c_char, func: CFunction) {
-	lua_pushcfunction(l, func);
-	lua_setglobal(l, name);
+	unsafe {
+		lua_pushcfunction(l, func);
+		lua_setglobal(l, name)
+	}
 }
 
 macro_rules! lua_is {
@@ -1029,7 +908,7 @@ macro_rules! lua_is {
 			/// # Safety
 			/// `l` must be a valid pointer to a Lua state.
 			$vis unsafe fn $name(l: *mut State, idx: c_int) -> bool {
-				lua_type(l, idx) == ($type as _)
+				(unsafe { lua_type(l, idx) }) == ($type as _)
 			}
 		)*
 	};
@@ -1050,7 +929,7 @@ lua_is! {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_isnoneornil(l: *mut State, idx: c_int) -> bool {
-	lua_type(l, idx) <= 0
+	unsafe { lua_type(l, idx) <= 0 }
 }
 
 // `lua_pushliteral` omitted here because it is *only* ever useful as a macro,
@@ -1062,7 +941,7 @@ pub unsafe fn lua_isnoneornil(l: *mut State, idx: c_int) -> bool {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_pushglobaltable(l: *mut State) {
-	lua_rawgeti(l, REGISTRY_INDEX, REGISTRY_GLOBALS);
+	unsafe { lua_rawgeti(l, REGISTRY_INDEX, REGISTRY_GLOBALS) };
 }
 
 /// Equivalent to the `lua_tostring` C macro.
@@ -1070,7 +949,7 @@ pub unsafe fn lua_pushglobaltable(l: *mut State) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_tostring(l: *mut State, idx: c_int) -> *const c_char {
-	lua_tolstring(l, idx, null_mut())
+	unsafe { lua_tolstring(l, idx, null_mut()) }
 }
 
 /// Equivalent to the `lua_insert` C macro.
@@ -1078,7 +957,7 @@ pub unsafe fn lua_tostring(l: *mut State, idx: c_int) -> *const c_char {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_insert(l: *mut State, idx: c_int) {
-	lua_rotate(l, idx, 1)
+	unsafe { lua_rotate(l, idx, 1) }
 }
 
 /// Equivalent to the `lua_remove` C macro.
@@ -1086,8 +965,10 @@ pub unsafe fn lua_insert(l: *mut State, idx: c_int) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_remove(l: *mut State, idx: c_int) {
-	lua_rotate(l, idx, -1);
-	lua_pop(l, 1);
+	unsafe {
+		lua_rotate(l, idx, -1);
+		lua_pop(l, 1)
+	}
 }
 
 /// Equivalent to the `lua_replace` C macro.
@@ -1095,8 +976,10 @@ pub unsafe fn lua_remove(l: *mut State, idx: c_int) {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub unsafe fn lua_replace(l: *mut State, idx: c_int) {
-	lua_copy(l, -1, idx);
-	lua_pop(l, 1);
+	unsafe {
+		lua_copy(l, -1, idx);
+		lua_pop(l, 1)
+	}
 }
 
 c_int_enum! {
