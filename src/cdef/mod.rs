@@ -377,7 +377,7 @@ pub type CFunction = unsafe extern "C-unwind" fn(l: *mut State) -> c_int;
 /// with the continuation function.
 /// 
 /// `status` is generally also a valid [`Status`].
-pub type KFunction = unsafe extern "C" fn (
+pub type KFunction = unsafe extern "C-unwind" fn (
 	l: *mut State, status: c_int, ctx: KContext
 ) -> c_int;
 
@@ -393,7 +393,7 @@ pub type KFunction = unsafe extern "C" fn (
 /// The returned value must be a valid pointer to a string, or a null pointer if
 /// no data is available. The pointer must be valid for reading at least until
 /// the next usage of the function.
-pub type Reader = unsafe extern "C" fn (
+pub type Reader = unsafe extern "C-unwind" fn (
 	l: *mut State, ud: *mut c_void, sz: *mut usize
 ) -> *const c_char;
 
@@ -405,13 +405,13 @@ pub type Reader = unsafe extern "C" fn (
 /// state, `ud` is always the user-defined data that was passed along with the
 /// reader function, and `p` is always a pointer that's valid for reading that
 /// points to a memory block of size `sz` bytes.
-pub type Writer = unsafe extern "C" fn (
+pub type Writer = unsafe extern "C-unwind" fn (
 	l: *mut State, p: *const c_void, sz: usize, ud: *mut c_void
 ) -> c_int;
 
 /// Memory allocation function.
 /// Also known as `lua_Alloc`.
-pub type Alloc = unsafe extern "C" fn (
+pub type Alloc = unsafe extern "C-unwind" fn (
 	ud: *mut c_void,
 	ptr: *mut c_void, osize: usize,
 	nsize: usize
@@ -419,7 +419,7 @@ pub type Alloc = unsafe extern "C" fn (
 
 /// Warning handler function.
 /// Also known as `lua_WarnFunction`.
-pub type WarnFunction = unsafe extern "C" fn (
+pub type WarnFunction = unsafe extern "C-unwind" fn (
 	ud: *mut c_void, msg: *const c_char, tocont: c_int
 );
 

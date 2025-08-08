@@ -19,7 +19,7 @@ use crate::cdef::auxlib::*;
 /// 
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
-pub unsafe extern "C" fn lua_panic_handler(l: *mut State) -> c_int {
+pub unsafe extern "C-unwind" fn lua_panic_handler(l: *mut State) -> c_int {
 	let msg_ptr = unsafe { lua_tostring(l, -1) };
 	let msg = if !msg_ptr.is_null() {
 		let msg = unsafe { CStr::from_ptr(msg_ptr) };
@@ -233,7 +233,7 @@ impl Lua {
 		}
 
 		// This should be OK for emulating the typical allocation routine used with Lua.
-		unsafe extern "C" fn l_alloc(
+		unsafe extern "C-unwind" fn l_alloc(
 			_ud: *mut c_void,
 			ptr: *mut c_void, osize: usize,
 			nsize: usize

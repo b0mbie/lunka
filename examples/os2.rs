@@ -56,7 +56,7 @@ const LIBRARY: LuaLibrary<1> = lua_library! {
 };
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn luaopen_os2(l: *mut LuaState) -> c_int {
+unsafe extern "C-unwind" fn luaopen_os2(l: *mut LuaState) -> c_int {
 	let lua = LuaThread::from_ptr(l);
 	lua.new_lib(&LIBRARY);
 	1
