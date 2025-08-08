@@ -577,14 +577,10 @@ impl Managed<'_> {
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
-	pub unsafe fn to_c_chars_meta(&mut self, index: c_int) -> Option<&[c_char]> {
+	pub unsafe fn to_c_chars_meta(&mut self, index: c_int) -> &[c_char] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
-		if !str_ptr.is_null() {
-			Some(unsafe { from_raw_parts(str_ptr, len) })
-		} else {
-			None
-		}
+		unsafe { from_raw_parts(str_ptr, len) }
 	}
 
 	/// Convert any Lua value at the given index to a string in a reasonable
@@ -594,13 +590,9 @@ impl Managed<'_> {
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn to_c_str_meta(&mut self, index: c_int) -> Option<&CStr> {
+	pub fn to_c_str_meta(&mut self, index: c_int) -> &CStr {
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
-		if !str_ptr.is_null() {
-			Some(unsafe { CStr::from_ptr(str_ptr) })
-		} else {
-			None
-		}
+		unsafe { CStr::from_ptr(str_ptr) }
 	}
 
 	/// Convert any Lua value at the given index to a string in a reasonable
@@ -617,13 +609,9 @@ impl Managed<'_> {
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
-	pub unsafe fn to_string_meta(&mut self, index: c_int) -> Option<&[u8]> {
+	pub unsafe fn to_string_meta(&mut self, index: c_int) -> &[u8] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
-		if !str_ptr.is_null() {
-			Some(unsafe { from_raw_parts(str_ptr as *const _, len) })
-		} else {
-			None
-		}
+		unsafe { from_raw_parts(str_ptr as *const _, len) }
 	}
 }
