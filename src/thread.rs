@@ -801,14 +801,6 @@ impl Thread {
 		unsafe { lua_rawsetp(self.as_ptr(), tbl_index, ptr) }
 	}
 
-	/// Set the C function `func` as the new value of global `name`.
-	/// 
-	/// # Errors
-	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-	pub fn register(&self, name: &CStr, func: CFunction) {
-		unsafe { lua_register(self.as_ptr(), name.as_ptr(), func) }
-	}
-
 	/// Remove the element at the given valid index, shifting down the elements
 	/// above this index to fill the gap.
 	/// 

@@ -387,6 +387,18 @@ impl Managed<'_> {
 		unsafe { lua_pop(self.l, n as _) }
 	}
 
+	/// Set the C function `func` as the new value of global `name`,
+	/// calling metamethods for the global table, if there are any.
+	/// 
+	/// # Errors
+	/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn register(&mut self, name: &CStr, func: CFunction) {
+		unsafe { lua_register(self.as_ptr(), name.as_ptr(), func) }
+	}
+
 	/// If `package.loaded[modname]` is not true, calls the function `open_fn`
 	/// with the string `module_name` as an argument and sets the call result to
 	/// `package.loaded[modname]`, as if that function has been called through
