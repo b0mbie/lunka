@@ -272,7 +272,7 @@ impl Managed<'_> {
 	/// or an error code in case of errors.
 	/// In case of errors, the error object is on the top of the stack.
 	/// 
-	/// # Starting a coroutine
+	/// ## Starting a coroutine
 	/// To start a coroutine:
 	/// - Push the main function plus any arguments onto the empty stack of the thread.
 	/// - Then, call this function, with `n_args` being the number of arguments.
@@ -282,12 +282,15 @@ impl Managed<'_> {
 	/// contains the values passed to [`Thread::yield_with`] or returned by the
 	/// body function.
 	/// 
-	/// # Resuming a coroutine
+	/// ## Resuming a coroutine
 	/// To resume a coroutine:
 	/// - Remove the yielded values from its stack.
 	/// - Push the values to be passed as results from the yield.
 	/// - Call this function.
-	pub fn resume(&mut self, n_args: c_uint) -> (Status, c_int) {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn resume(&mut self, n_args: c_uint) -> (Status, c_int) {
 		let mut n_res = 0;
 		let status = unsafe { lua_resume(
 			self.as_ptr(), null_mut(),
@@ -300,7 +303,10 @@ impl Managed<'_> {
 	/// Resume this thread, also specifying the thread that is resuming this one.
 	/// 
 	/// See [`Managed::resume`] for more information.
-	pub fn resume_from(&mut self, from: &Self, n_args: c_uint) -> (Status, c_int) {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn resume_from(&mut self, from: &Self, n_args: c_uint) -> (Status, c_int) {
 		let mut n_res = 0;
 		let status = unsafe { lua_resume(
 			self.as_ptr(), from.as_ptr(),
@@ -332,7 +338,7 @@ impl Managed<'_> {
 	/// Typically, the message handler is used to add more debug information to
 	/// the error object, such as a stack traceback.
 	/// Such information cannot be gathered after the return of this function,
-	/// since by then the stack has unwound. 
+	/// since by then the stack has unwound.
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
