@@ -417,8 +417,15 @@ pub type Alloc = unsafe extern "C-unwind" fn (
 	nsize: usize
 ) -> *mut c_void;
 
-/// Warning handler function.
+/// Function called by Lua to emit warnings.
 /// Also known as `lua_WarnFunction`.
+/// 
+/// `tocont` is a boolean that indicates
+/// whether the message is to be continued with the string passed in the next call.
+/// 
+/// # Safety
+/// `ud` must be the userdata passed at the point of setting the warning function, and
+/// `msg` must point to a valid C string.
 pub type WarnFunction = unsafe extern "C-unwind" fn (
 	ud: *mut c_void, msg: *const c_char, tocont: c_int
 );
