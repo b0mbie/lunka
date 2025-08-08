@@ -10,13 +10,13 @@ use crate::{
 #[cfg(feature = "auxlib")]
 use crate::{
 	aux_options::*,
-	auxlib::*,
-	reg::*
+	cdef::auxlib::*,
+	reg::*,
 };
 
 use core::{
 	ffi::{
-		c_char, c_int, c_uint, c_ushort, c_void, CStr,
+		c_char, c_int, c_uint, c_void, CStr,
 	},
 	marker::PhantomData,
 	mem::transmute,
@@ -354,9 +354,9 @@ impl Thread {
 	/// userdata at the given index and returns the type of the pushed value.
 	/// 
 	/// If the userdata does not have that value, push `nil` and return [`Type::None`]. 
-	pub fn get_i_uservalue(&self, ud_index: c_int, n: c_ushort) -> Type {
+	pub fn get_i_uservalue(&self, ud_index: c_int, n: c_int) -> Type {
 		unsafe { Type::from_c_int_unchecked(
-			lua_getiuservalue(self.as_ptr(), ud_index, n as _)
+			lua_getiuservalue(self.as_ptr(), ud_index, n)
 		) }
 	}
 
@@ -507,9 +507,7 @@ impl Thread {
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn new_thread(&self) -> Coroutine<'_> {
-		Coroutine {
-			thread: unsafe { Thread::from_ptr_mut(lua_newthread(self.as_ptr())) },
-		}
+		Coroutine::new(unsafe { Thread::from_ptr_mut(lua_newthread(self.as_ptr())) })
 	}
 
 	/// Create and push on the stack a new full userdata, with `n_uservalues`
@@ -539,9 +537,9 @@ impl Thread {
 	pub unsafe fn new_userdata_raw(
 		&self,
 		size: usize,
-		n_uservalues: c_ushort
+		n_uservalues: c_int,
 	) -> *mut c_void {
-		unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues as _) }
+		unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues) }
 	}
 	
 	/// Pop a key from the stack, and push a key–value pair from the table at
@@ -598,8 +596,8 @@ impl Thread {
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors) if `n_upvalues > 0`.
-	pub fn push_c_closure(&self, func: CFunction, n_upvalues: u8) {
-		unsafe { lua_pushcclosure(self.as_ptr(), func, n_upvalues as _) }
+	pub fn push_c_closure(&self, func: CFunction, n_upvalues: c_int) {
+		unsafe { lua_pushcclosure(self.as_ptr(), func, n_upvalues) }
 	}
 
 	/// Push a light C function onto the stack (that is, a C function with no
@@ -854,8 +852,8 @@ impl Thread {
 	/// associated to the full userdata at the given index.
 	/// 
 	/// Returns `false` if the userdata does not have that value.
-	pub fn set_i_uservalue(&self, ud_index: c_int, n: c_ushort) -> bool {
-		(unsafe { lua_setiuservalue(self.as_ptr(), ud_index, n as _) }) != 0
+	pub fn set_i_uservalue(&self, ud_index: c_int, n: c_int) -> bool {
+		(unsafe { lua_setiuservalue(self.as_ptr(), ud_index, n) }) != 0
 	}
 
 	/// Pop a table or `nil` from the stack and sets that value as the new

@@ -3,7 +3,7 @@
 
 #[cfg(feature = "auxlib")]
 pub use crate::{
-	auxlib::Reg as LuaReg,
+	cdef::auxlib::Reg as LuaReg,
 	aux_options::AuxOptions as LuaAuxOptions,
 	reg::Library as LuaLibrary
 };

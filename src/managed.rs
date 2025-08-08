@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[cfg(feature = "auxlib")]
-use crate::auxlib::*;
+use crate::cdef::auxlib::*;
 
 use core::{
 	ffi::{

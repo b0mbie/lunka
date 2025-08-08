@@ -1,7 +1,9 @@
 //! See [`Library`].
  
-use crate::auxlib::Reg;
-use crate::cdef::CFunction;
+use crate::cdef::{
+	auxlib::Reg,
+	CFunction,
+};
 
 use core::{
 	ffi::CStr,
