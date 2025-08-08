@@ -59,10 +59,10 @@ pub const NO_REF: c_int = -2;
 /// Constant that indicates a reference to `nil`.
 pub const REF_NIL: c_int = -1;
 
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), target_os = "windows"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
 unsafe extern "C-unwind" {
 	pub fn luaL_newstate() -> *mut State;
 

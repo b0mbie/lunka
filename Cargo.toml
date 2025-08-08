@@ -9,6 +9,9 @@ repository = "https://github.com/b0mbie/lunka"
 documentation = "https://docs.rs/lunka"
 keywords = ["lua"]
 
+[build-dependencies]
+lunka-src = { version = "54.8.0", optional = true }
+
 [[example]]
 name = "hello"
 
@@ -30,6 +33,8 @@ crate-type = ["cdylib"]
 name = "string_enum"
 
 [features]
+default = ["alloc", "auxlib", "stdlibs", "link-vendored"]
+
 # Use Rust's `alloc` crate.
 alloc = []
 
@@ -45,16 +50,12 @@ auxlib = []
 # Include and use definitions for importing the standard libraries (in `lualib.h`).
 stdlibs = []
 
-# Include attributes to link to `lua54` using `raw-dylib` on Windows, and
-# `lua5.4` using `dylib` otherwise.
-# You may disable this if, for example, you have your own `build.rs` script that
-# links Lua in a different way.
-link-lua54 = []
+# Build Lua from source, linking to it.
+link-vendored = ["dep:lunka-src"]
 
-# Link statically the library `lua54` on Windows, and `lua5.4` on other
-# platforms.
-# This may be useful for applications, since Lua will become embedded in the
-# executable.
-link-static = ["link-lua54"]
+# Link statically to the system library `lua54` on Windows, and `lua` on other platforms.
+link-system = []
 
-default = ["alloc", "auxlib", "stdlibs", "link-lua54"]
+# Link *dynamically* to the system library `lua54` using `raw-dylib` on Windows,
+# and `lua` using `dylib` on other platforms.
+link-dynamic = ["link-system"]

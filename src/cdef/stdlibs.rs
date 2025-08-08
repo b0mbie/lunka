@@ -14,10 +14,10 @@ pub const MATH_LIB_NAME: &CStr = c"math";
 pub const DEBUG_LIB_NAME: &CStr = c"debug";
 pub const PACKAGE_LIB_NAME: &CStr = c"package";
 
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), target_os = "windows"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
 unsafe extern "C-unwind" {
 	lua_state_func! {
 		pub fn luaopen_base(self) -> c_int;

@@ -565,10 +565,10 @@ macro_rules! lua_state_func {
 }
 pub(crate) use lua_state_func;
 
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
-#[cfg_attr(all(feature = "link-lua54", not(feature = "link-static"), not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", target_os = "windows"), link(name = "lua54", kind = "static"))]
-#[cfg_attr(all(feature = "link-lua54", feature = "link-static", not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", target_os = "windows"), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(feature = "link-system", feature = "link-dynamic", not(target_os = "windows")), link(name = "lua5.4", kind = "dylib"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), target_os = "windows"), link(name = "lua54", kind = "static"))]
+#[cfg_attr(all(feature = "link-system", not(feature = "link-dynamic"), not(target_os = "windows")), link(name = "lua5.4", kind = "static"))]
 unsafe extern "C-unwind" {
 	pub fn lua_newstate(f: Alloc, ud: *mut c_void) -> *mut State;
 	pub fn lua_close(l: *mut State);
