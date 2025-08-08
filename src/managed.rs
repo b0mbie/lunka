@@ -102,8 +102,8 @@ impl Managed<'_> {
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
-	pub unsafe fn call(&mut self, n_args: c_uint, n_results: c_uint) {
-		unsafe { lua_call(self.l, n_args as _, n_results as _) }
+	pub unsafe fn call(&mut self, n_args: c_uint, n_results: c_int) {
+		unsafe { lua_call(self.l, n_args as _, n_results) }
 	}
 
 	/// Behaves exactly like [`Managed::call`], but allows the called function
@@ -121,12 +121,12 @@ impl Managed<'_> {
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn call_k(
 		&mut self,
-		n_args: c_uint, n_results: c_uint,
+		n_args: c_uint, n_results: c_int,
 		continuation: KFunction, context: KContext,
 	) {
 		unsafe { lua_callk(
 			self.l,
-			n_args as _, n_results as _,
+			n_args as _, n_results,
 			context, Some(continuation)
 		) }
 	}
@@ -338,11 +338,11 @@ impl Managed<'_> {
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn pcall(
 		&mut self,
-		n_args: c_uint, n_results: c_uint,
+		n_args: c_uint, n_results: c_int,
 		err_func: c_int
 	) -> Status {
 		unsafe { Status::from_c_int_unchecked(
-			lua_pcall(self.l, n_args as _, n_results as _, err_func)
+			lua_pcall(self.l, n_args as _, n_results, err_func)
 		) }
 	}
 
@@ -360,13 +360,13 @@ impl Managed<'_> {
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
 	pub unsafe fn pcall_k(
 		&mut self,
-		n_args: c_uint, n_results: c_uint,
+		n_args: c_uint, n_results: c_int,
 		err_func: c_int,
 		continuation: KFunction, context: KContext
 	) -> Status {
 		unsafe { Status::from_c_int_unchecked(lua_pcallk(
 			self.l,
-			n_args as _, n_results as _,
+			n_args as _, n_results,
 			err_func,
 			context, Some(continuation)
 		)) }
