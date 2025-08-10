@@ -516,7 +516,7 @@ impl Managed<'_> {
 }
 
 #[cfg(feature = "auxlib")]
-impl Managed<'_> {
+impl<'l> Managed<'l> {
 	/// Call a metamethod `event` on the object at index `obj_index`.
 	/// 
 	/// If the object at index `obj_index` has a metatable and this metatable
@@ -595,7 +595,7 @@ impl Managed<'_> {
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
-	pub unsafe fn to_c_chars_meta(&mut self, index: c_int) -> &[c_char] {
+	pub unsafe fn to_c_chars_meta(&mut self, index: c_int) -> &'l [c_char] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		unsafe { from_raw_parts(str_ptr, len) }
@@ -608,7 +608,7 @@ impl Managed<'_> {
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn to_c_str_meta(&mut self, index: c_int) -> &CStr {
+	pub fn to_c_str_meta(&mut self, index: c_int) -> &'l CStr {
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
 		unsafe { CStr::from_ptr(str_ptr) }
 	}
@@ -627,7 +627,7 @@ impl Managed<'_> {
 	/// 
 	/// # Safety
 	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
-	pub unsafe fn to_string_meta(&mut self, index: c_int) -> &[u8] {
+	pub unsafe fn to_string_meta(&mut self, index: c_int) -> &'l [u8] {
 		let mut len = 0;
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
 		unsafe { from_raw_parts(str_ptr as *const _, len) }
