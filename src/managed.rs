@@ -608,7 +608,10 @@ impl<'l> Managed<'l> {
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn to_c_str_meta(&mut self, index: c_int) -> &'l CStr {
+	/// 
+	/// # Safety
+	/// Calling untrusted code in a possibly-unsound environment can cause Undefined Behavior.
+	pub unsafe fn to_c_str_meta(&mut self, index: c_int) -> &'l CStr {
 		let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
 		unsafe { CStr::from_ptr(str_ptr) }
 	}
