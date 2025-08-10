@@ -55,11 +55,10 @@ unsafe extern "C-unwind" fn l_test(l: *mut LuaState) -> c_int {
 unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	let mut test = move |variant: &[u8]| {
-		lua.run_managed(move |mut mg| {
-			mg.push_c_function(l_test);
-			mg.push_string(variant);
-			unsafe { mg.call(1, 0) }
-		})
+		let mut mg = lua.managed();
+		mg.push_c_function(l_test);
+		mg.push_string(variant);
+		unsafe { mg.call(1, 0) }
 	};
 	test(b"udp");
 	test(b"tcp");
@@ -71,9 +70,7 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 
 fn main() {
 	let mut lua = Lua::new();
-	let did_run_ok = lua.run_managed(move |mut mg| {
-		mg.push_c_function(l_main);
-		unsafe { mg.pcall(0, 1, 0).is_ok() }
-	});
+	lua.push_c_function(l_main);
+	let did_run_ok = unsafe { lua.managed().pcall(0, 1, 0).is_ok() };
 	assert!(!did_run_ok, "test code should fail");
 }

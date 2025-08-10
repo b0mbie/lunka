@@ -135,34 +135,31 @@ impl Thread {
 		self as *const Self as *mut State
 	}
 
-	/// Run code that can restart the GC and potentially invalidate pointers
-	/// in a context.
-	pub fn run_managed<R>(&mut self, func: impl FnOnce(Managed<'_>) -> R) -> R {
-		func(Managed {
+	/// Return a context that allows to run code
+	/// that can restart the GC and potentially invalidate pointers.
+	pub fn managed(&mut self) -> Managed<'_> {
+		Managed {
 			l: self.as_ptr(),
 			_life: PhantomData
-		})
+		}
 	}
 
-	/// This is the same as [`Thread::run_managed`], however it doesn't borrow
+	/// This is the same as [`Thread::managed`], however it doesn't borrow
 	/// mutably by assuming that the garbage collector will not collect (and
 	/// thus invalidate) any outside references.
 	/// 
 	/// # Safety
-	/// The body of `func` must not include any operations that may cause the
-	/// garbage collector to run a cycle.
+	/// The returned context must not be used for any operations
+	/// which may cause the garbage collector to invalidate pointers.
 	/// 
-	/// For example, if performing arithmetic on numbers does not trigger any
-	/// metamethods, or it triggers metamethods that can't ever cause the
-	/// collector to collect, then this invariant is not broken.
-	pub unsafe fn run_managed_no_gc<R>(
-		&self,
-		func: impl FnOnce(Managed<'_>) -> R
-	) -> R {
-		func(Managed {
+	/// For example, if performing arithmetic does not trigger any metamethods,
+	/// or if returned pointers are still on the Lua stack,
+	/// then this guarantee is not broken.
+	pub unsafe fn managed_no_gc(&self) -> Managed<'_> {
+		Managed {
 			l: self.as_ptr(),
 			_life: PhantomData
-		})
+		}
 	}
 
 	/// Close all active to-be-closed variables in the main thread, release all

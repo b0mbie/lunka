@@ -22,31 +22,30 @@ unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {
 		}
 	};
 
-	lua.run_managed(|mut mg| {
-		mg.create_table(0, 1);
+	let mut mg = lua.managed();
+	mg.create_table(0, 1);
 
-		let file_type = meta.file_type();
-		mg.push_string(if file_type.is_file() {
-			"file"
-		} else if file_type.is_dir() {
-			"directory"
-		} else if file_type.is_symlink() {
-			"symlink"
-		} else {
-			"other"
-		}.as_bytes());
-		mg.set_field(-2, c"type");
+	let file_type = meta.file_type();
+	mg.push_string(if file_type.is_file() {
+		"file"
+	} else if file_type.is_dir() {
+		"directory"
+	} else if file_type.is_symlink() {
+		"symlink"
+	} else {
+		"other"
+	}.as_bytes());
+	unsafe { mg.set_field(-2, c"type") };
 
-		mg.push_integer(meta.len() as _);
-		mg.set_field(-2, c"len");
+	mg.push_integer(meta.len() as _);
+	unsafe { mg.set_field(-2, c"len") };
 
-		if let Ok(time) = meta.modified() {
-			if let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
-				mg.push_number(time.as_secs_f64());
-				mg.set_field(-2, c"modified");
-			}
+	if let Ok(time) = meta.modified() {
+		if let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
+			mg.push_number(time.as_secs_f64());
+			unsafe { mg.set_field(-2, c"modified") };
 		}
-	});
+	}
 
 	1
 }

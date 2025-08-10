@@ -62,7 +62,7 @@ impl LuaThreadExt for LuaThread {
 
 fn main() {
 	let mut lua = Lua::new();
-	lua.run_managed(|mut mg| mg.open_libs());
+	lua.managed().open_libs();
 
 	if !lua.load_string(PRINT_CODE.as_bytes(), PRINT_CODE_LUA_NAME).is_ok() {
 		panic!("couldn't load Lua chunk");
@@ -72,10 +72,8 @@ fn main() {
 	lua.push(3.1 as LuaNumber);
 	lua.push("how");
 
-	if !lua.run_managed(|mut mg| {
-		mg.restart_gc();
-		unsafe { mg.pcall(3, 0, 0) }
-	}).is_ok() {
+	lua.restart_gc();
+	if unsafe { !lua.managed().pcall(3, 0, 0).is_ok() } {
 		let error_bytes = lua.to_string(-1);
 		panic!(
 			"error while running Lua chunk: {}",
