@@ -4,20 +4,19 @@
 use lunka::prelude::*;
 use std::{
 	ffi::c_int,
-	fmt::Write,
-	fs::metadata, time::SystemTime,
+	fs::metadata,
+	time::SystemTime,
 };
 
 unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {	
 	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	let path = lua.check_string(1);
 	
-	let meta = match metadata(String::from_utf8_lossy(path).into_owned()) {
+	let meta = match metadata(String::from_utf8_lossy(path).as_ref()) {
 		Ok(meta) => meta,
 		Err(error) => {
 			lua.push_fail();
-			let mut buf = lua.new_buffer();
-			let _ = write!(buf, "{error}");
+			lua.managed().push_display(&error);
 			return 2
 		}
 	};
@@ -40,23 +39,22 @@ unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {
 	mg.push_integer(meta.len() as _);
 	unsafe { mg.set_field(-2, c"len") };
 
-	if let Ok(time) = meta.modified() {
-		if let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
-			mg.push_number(time.as_secs_f64());
-			unsafe { mg.set_field(-2, c"modified") };
-		}
+	if let Ok(time) = meta.modified()
+	&& let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
+		mg.push_number(time.as_secs_f64());
+		unsafe { mg.set_field(-2, c"modified") };
 	}
 
 	1
 }
 
-const LIBRARY: LuaLibrary<1> = lua_library! {
+const LIBRARY: LuaLibrary<1> = library! {
 	metadata: l_metadata
 };
 
 #[unsafe(no_mangle)]
 unsafe extern "C-unwind" fn luaopen_os2(l: *mut LuaState) -> c_int {
-	let lua = LuaThread::from_ptr(l);
-	lua.new_lib(&LIBRARY);
+	let lua = unsafe { LuaThread::from_ptr_mut(l) };
+	lua.managed().new_lib(&LIBRARY);
 	1
 }

@@ -29,7 +29,7 @@ unsafe impl LuaEnum<4> for SocketKind {
 			1 => Self::Tcp,
 			2 => Self::UnixUdp,
 			3 => Self::UnixTcp,
-			_ => ::core::hint::unreachable_unchecked(),
+			_ => unsafe { ::core::hint::unreachable_unchecked() }
 		}
 	}
 }

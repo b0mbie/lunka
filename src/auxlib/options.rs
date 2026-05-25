@@ -6,9 +6,6 @@ use core::{
 		c_char
 	},
 	marker::PhantomData,
-	mem::{
-		transmute, MaybeUninit
-	},
 	ptr::null,
 	slice::from_raw_parts,
 };
@@ -29,23 +26,16 @@ pub struct AuxOptions<'str, const N: usize> {
 impl<'str, const N: usize> AuxOptions<'str, N> {
 	/// Construct an instance of [`AuxOptions`] with a static list of options.
 	pub const fn new(items: [&'str CStr; N]) -> Self {
-		// SAFETY: We make an uninit `[*const c_char; N]`, but then immediately
-		// fill it with stuff without reading from it.
-		#[allow(clippy::uninit_assumed_init)]
-		let regs: [*const c_char; N] = unsafe {
-			let mut dest: [*const c_char; N] = MaybeUninit::uninit().assume_init();
-	
-			let mut i = 0;
-			while i < N {
-				dest[i] = items[i].as_ptr();
-				i += 1;
-			}
+		let mut options = [null::<c_char>(); N];
 
-			dest
-		};
+		let mut i = 0;
+		while i < N {
+			options[i] = items[i].as_ptr();
+			i += 1;
+		}
 
 		Self {
-			options: regs,
+			options,
 			terminator: null(),
 			_life: PhantomData
 		}
@@ -58,14 +48,12 @@ impl<'str, const N: usize> AuxOptions<'str, N> {
 
 	/// Return a pointer to this structure to be used with C.
 	pub const fn as_ptr(&self) -> *const *const c_char {
-		unsafe { transmute(self as *const _) }
+		self.options.as_ptr()
 	}
 
-	/// Return a slice of [`*const c_char`](c_char)s that represent the string
+	/// Return a null-terminated slice of C string pointers that represent the string
 	/// options contained within the structure.
-	pub const fn as_str_ptr_slice(&self) -> &[*const c_char] {
-		unsafe { from_raw_parts(
-			self as *const _ as *const *const c_char, N + 1
-		) }
+	pub const fn as_terminated_slice(&self) -> &[*const c_char] {
+		unsafe { from_raw_parts(self.as_ptr(), N + 1) }
 	}
 }

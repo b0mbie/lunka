@@ -7,11 +7,12 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 	let lua = unsafe { LuaThread::from_ptr_mut(l) };
 	lua.managed().open_libs();
 
-	let is_ok = lua.load_string(
+	let is_ok = lua.managed().load_string(
 		r#"print("Hello, world!")"#,
 		c"=<embedded>"
 	).is_ok();
 	if !is_ok {
+		let mut lua = lua.managed();
 		let error = {
 			lua.to_string(-1)
 				.and_then(move |bytes| core::str::from_utf8(bytes).ok())
@@ -24,6 +25,7 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 
 	let is_ok = unsafe { lua.managed().pcall(0, 0, 0).is_ok() };
 	if !is_ok {
+		let mut lua = lua.managed();
 		let error = {
 			lua.to_string(-1)
 				.and_then(move |bytes| core::str::from_utf8(bytes).ok())

@@ -11,24 +11,23 @@ extern crate alloc;
 #[doc = include_str!("../doc/errors.md")]
 pub mod errors {}
 
+pub mod cdef;
+
 #[cfg(feature = "auxlib")]
-mod aux_options;
-#[cfg(feature = "auxlib")]
-pub use aux_options::*;
+mod auxlib;
+pub use auxlib::*;
+
 mod coroutine;
 pub use coroutine::*;
-pub mod cdef;
 mod dbg_what;
 pub use dbg_what::*;
 mod gc_mode;
 pub use gc_mode::*;
+mod indices;
+pub use indices::*;
 mod managed;
 pub use managed::*;
 pub mod prelude;
-#[cfg(feature = "auxlib")]
-mod reg;
-#[cfg(feature = "auxlib")]
-pub use reg::*;
 mod state;
 pub use state::*;
 mod thread;

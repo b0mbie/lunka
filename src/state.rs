@@ -19,7 +19,7 @@ use crate::cdef::auxlib::*;
 /// 
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
-pub unsafe extern "C-unwind" fn lua_panic_handler(l: *mut State) -> c_int {
+pub unsafe extern "C-unwind" fn lua_panic_handler(l: *mut lua_State) -> c_int {
 	let msg_ptr = unsafe { lua_tostring(l, -1) };
 	let msg = if !msg_ptr.is_null() {
 		let msg = unsafe { CStr::from_ptr(msg_ptr) };
@@ -142,14 +142,14 @@ impl Lua {
 	/// With this function, the [`Lua`] takes ownership of the Lua state.
 	/// You may not, for example, pass a coroutine pointer to this, as the
 	/// coroutine will not be owned by Rust code.
-	pub unsafe fn from_ptr(l: *mut State) -> Self {
+	pub unsafe fn from_ptr(l: *mut lua_State) -> Self {
 		let thread = unsafe { Thread::from_ptr_mut(l) };
 		Self {
 			thread
 		}
 	}
 
-	unsafe fn from_new_ptr(l: *mut State) -> Option<Self> {
+	unsafe fn from_new_ptr(l: *mut lua_State) -> Option<Self> {
 		if !l.is_null() {
 			let lua = Self {
 				thread: unsafe { Thread::from_ptr_mut(l) }
@@ -179,33 +179,36 @@ impl Lua {
 		unsafe { Self::from_new_ptr(luaL_newstate()) }
 	}
 
-	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
+	/// Construct a new [`Lua`] using an allocation function (see [`lua_Alloc`]).
 	/// 
 	/// Unlike [`Lua::try_new_with_alloc_fn`], this function never fails.
 	/// 
 	/// # Safety
 	/// `alloc_fn_data` must be valid to be passed to `alloc_fn`.
-	pub unsafe fn new_with_alloc_fn(alloc_fn: Alloc, alloc_fn_data: *mut c_void) -> Self {
+	pub unsafe fn new_with_alloc_fn(alloc_fn: lua_Alloc, alloc_fn_data: *mut c_void) -> Self {
 		match unsafe { Self::from_new_ptr(lua_newstate(alloc_fn, alloc_fn_data)) } {
 			Some(lua) => lua,
 			_ => panic!("not enough memory to create Lua state using a custom allocator function"),
 		}
 	}
 
-	/// Construct a new [`Lua`] using an allocation function (see [`Alloc`]).
+	/// Construct a new [`Lua`] using an allocation function (see [`lua_Alloc`]).
 	/// 
 	/// The function will return `None` if allocation failed.
 	/// 
 	/// # Safety
 	/// `alloc_fn_data` must be valid to be passed to `alloc_fn`.
-	pub unsafe fn try_new_with_alloc_fn(alloc_fn: Alloc, alloc_fn_data: *mut c_void) -> Option<Self> {
+	pub unsafe fn try_new_with_alloc_fn(alloc_fn: lua_Alloc, alloc_fn_data: *mut c_void) -> Option<Self> {
 		unsafe { Self::from_new_ptr(lua_newstate(alloc_fn, alloc_fn_data)) }
 	}
 
 	/// Construct a new [`Lua`] using the global Rust allocator,
 	/// aligning all allocations to the alignment of [`MaxAlign`].
 	/// 
-	/// Unlike [`Lua::try_new`], this function never fails.
+	/// # Panics
+	/// This function will panic if allocating the Lua state failed.
+	#[cfg(feature = "alloc")]
+	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
 		match Self::try_new() {
 			Some(lua) => lua,
@@ -225,11 +228,7 @@ impl Lua {
 		use core::ptr::null_mut;
 
 		fn guess_layout(size: usize) -> Option<Layout> {
-			if let Ok(layout) = Layout::from_size_align(size, align_of::<MaxAlign>()) {
-				Some(layout)
-			} else {
-				None
-			}
+			Layout::from_size_align(size, align_of::<MaxAlign>()).ok()
 		}
 
 		// This should be OK for emulating the typical allocation routine used with Lua.
@@ -290,7 +289,7 @@ impl Lua {
 	}
 
 	/// Return the raw pointer to the underlying Lua state.
-	pub fn as_ptr(&self) -> *mut State {
+	pub fn as_ptr(&mut self) -> *mut lua_State {
 		self.thread.as_ptr()
 	}
 }

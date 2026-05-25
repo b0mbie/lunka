@@ -24,9 +24,9 @@
 /// The macro uses an unsafe function, and is itself unsafe to use; there have
 /// to be sufficient format arguments, and they must be of the correct type.
 #[macro_export]
-macro_rules! lua_push_fmt_string {
+macro_rules! push_fmt_string {
 	($lua:expr, $fmt:expr $(, $($fmt_arg:tt)*)?) => {{
-		let lua: &$crate::Thread = &$lua;
+		let lua: &mut $crate::Thread = &mut $lua;
 		let fmt: &::core::ffi::CStr = $fmt;
 		$crate::cdef::lua_pushfstring(lua.as_ptr(), fmt.as_ptr()$(, $($fmt_arg)*)?)
 	}};
@@ -38,13 +38,13 @@ macro_rules! lua_push_fmt_string {
 /// `lua_fmt_error!(lua: &Thread, fmt: <string>, ...)`, where `fmt` is a
 /// literal format string, and `...` are the format arguments.
 /// 
-/// This function follows the same rules as [`lua_push_fmt_string!`].
+/// This function follows the same rules as [`push_fmt_string!`].
 /// 
 /// # Safety
 /// The macro uses an unsafe function, and is itself unsafe to use; there have
 /// to be sufficient format arguments, and they must be of the correct type.
 #[macro_export]
-macro_rules! lua_fmt_error {
+macro_rules! fmt_error {
 	($lua:expr, $fmt:literal $(, $fmt_arg:expr)*) => {{
 		let lua: &$crate::Thread = &$lua;
 		$crate::cdef::auxlib::luaL_error(
@@ -57,11 +57,11 @@ macro_rules! lua_fmt_error {
 	}};
 }
 
-/// Create a [`Library`](crate::reg::Library) with a more understandable syntax.
+/// Create a [`Library`](crate::Library) with a more understandable syntax.
 /// 
 /// The macro accepts a `struct` construction-like syntax, to construct an
 /// instance from a static array of pairs of [`CStr`](core::ffi::CStr) and
-/// [`Option<CFunction>`](crate::cdef::CFunction), where a field with a value creates a pair
+/// [`Option<lua_CFunction>`](crate::cdef::lua_CFunction), where a field with a value creates a pair
 /// `("name", Some(func_name))`, and a field with no value specified creates a
 /// pair `("name", None)`.
 /// 
@@ -85,31 +85,34 @@ macro_rules! lua_fmt_error {
 /// ```
 #[cfg(feature = "auxlib")]
 #[macro_export]
-macro_rules! lua_library {
+macro_rules! library {
 	{$(
 		$field:ident $(: $fn:expr)?
 	),*} => {
 		$crate::Library::new([
-			$(lua_library!(@field $field $($fn)?)),*
+			$($crate::library!(@field $field $($fn)?)),*
 		])
 	};
 
 	(@field $field:ident $fn:expr) => {
-		(unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(
-			concat!(stringify!($field), "\0").as_bytes()
-		) }, Some($fn))
+		($crate::library!(@field_str $field), Some($fn))
 	};
 
 	(@field $field:ident) => {
-		(unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(
-			concat!(stringify!($field), "\0").as_bytes()
-		) }, None)
+		($crate::library!(@field_str $field), None)
+	};
+
+	(@field_str $field:ident) => {
+		unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(
+			::core::concat!(::core::stringify!($field), "\0").as_bytes()
+		) }
 	};
 }
 
-/// Create an unnamed function that conforms to the signature of [`CFunction`](crate::cdef::CFunction).
+/// Create an unnamed function that conforms to
+/// the signature of [`lua_CFunction`](crate::cdef::lua_CFunction).
 /// 
-/// The macro accepts the pattern for the [`State`](crate::cdef::State) argument,
+/// The macro accepts the pattern for the [`lua_State`](crate::cdef::lua_State) argument,
 /// followed by `=>` and the function body.
 /// The function is not a closure; it may not capture any variables.
 /// 
@@ -120,20 +123,20 @@ macro_rules! lua_library {
 /// #[unsafe(no_mangle)]
 /// unsafe extern "C-unwind" fn luaopen_mylib(l: *mut LuaState) -> core::ffi::c_int {
 /// 	let lua = unsafe { LuaThread::from_ptr(l) };
-/// 	lua.new_lib(&lua_library! {
-/// 		sqr: lua_function!(l => {
+/// 	lua.new_lib(&library! {
+/// 		sqr: function!(l => {
 /// 			let lua = LuaThread::from_ptr(l);
 /// 			let x = lua.check_number(1);
 ///				lua.push_number(x * x);
 /// 			1
 ///			}),
-/// 		do_nothing: lua_function!(_ => 0)
+/// 		do_nothing: function!(_ => 0)
 /// 	});
 /// 	1
 /// }
 /// ```
 #[macro_export]
-macro_rules! lua_function {
+macro_rules! function {
 	($l:pat => $body:expr) => {{
 		unsafe extern "C-unwind" fn __lua_function_inner($l: *mut $crate::cdef::State) -> ::core::ffi::c_int {
 			$body

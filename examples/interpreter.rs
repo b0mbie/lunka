@@ -21,7 +21,7 @@ fn c_eprintln(data: &CStr) {
 
 fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 	if !status.is_ok() {
-		if let Some(message) = lua.to_c_str(-1) {
+		if let Some(message) = lua.managed().to_c_str(-1) {
 			c_eprintln(message);
 		}
 		unsafe { lua.managed().pop(1) };
@@ -32,11 +32,13 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 }
 
 unsafe extern "C-unwind" fn l_err_handler(l: *mut LuaState) -> c_int {
-	let lua = unsafe { LuaThread::from_ptr_mut(l) };
+	let mut lua = unsafe { LuaThread::from_ptr_mut(l) };
 
-	if let Some(msg) = lua.to_c_str(1) {
-		lua.traceback(lua, Some(msg), 1);
-		return 1
+	unsafe {
+		if let Some(msg) = lua.managed_no_gc().to_c_str(1) {
+			lua.managed_no_gc().traceback_self(Some(msg), 1);
+			return 1
+		}
 	}
 
 	let ok = unsafe { lua.managed().call_metamethod(1, c"__tostring") };
@@ -44,7 +46,7 @@ unsafe extern "C-unwind" fn l_err_handler(l: *mut LuaState) -> c_int {
 		return 1
 	}
 
-	unsafe { lua_push_fmt_string!(lua, c"(error object is a %s value)", lua.type_name_of(1)) };
+	unsafe { push_fmt_string!(lua, c"(error object is a %s value)", lua.type_name_of(1)) };
 
 	1
 }
@@ -60,12 +62,12 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 
 	let mut arguments = args().skip(1);
 	let load_status = if let Some(mut file_name) = arguments.next() {
-		lua.load_file(unsafe {
+		lua.managed().load_file(unsafe {
 			file_name.push('\0');
 			CStr::from_bytes_until_nul(file_name.as_bytes()).unwrap_unchecked()
 		})
 	} else {
-		lua.load_stdin()
+		lua.managed().load_stdin()
 	};
 
 	if !report(lua, load_status) {
@@ -74,7 +76,7 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 
 	let mut arg_count: c_uint = 0;
 	for arg in arguments {
-		lua.push_string(arg.as_bytes());
+		lua.managed().push_string(arg.as_bytes());
 		arg_count += 1;
 	}
 
