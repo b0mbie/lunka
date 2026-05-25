@@ -53,7 +53,7 @@ macro_rules! export_fn {
 	($entrypoint:expr => $($t:tt)*) => {
 		$crate::export_fn! {
 			@export
-			[export_name = $entrypoint]
+			[unsafe(export_name = $entrypoint)]
 			lunka_export_fn_impl_entrypoint
 			$($t)*
 		}
