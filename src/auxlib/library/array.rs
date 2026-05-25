@@ -14,8 +14,7 @@ use crate::{
 
 use super::Library;
 
-/// List of registered C functions to be used with
-/// [`Managed::new_lib`](crate::Managed::new_lib).
+/// Array-backed [`Library`].
 /// 
 /// The generic `const N: usize` specifies the static number of entries;
 /// `'name` indicates the lifetime for every key, which are [`CStr`]s.

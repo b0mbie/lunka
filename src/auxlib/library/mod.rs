@@ -24,7 +24,8 @@ mod macros;
 pub unsafe trait Library {
 	/// Returns the number of entries excluding the terminator.
 	/// 
-	/// This number serves as a hint to Lua .
+	/// This number serves as a hint to Lua
+	/// when allocating a table for the registered functions.
 	fn length(&self) -> usize;
 	/// Returns a pointer to an array of [`luaL_Reg`] terminated with [`luaL_Reg::NULL`].
 	/// 
