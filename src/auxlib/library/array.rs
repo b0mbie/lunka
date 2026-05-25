@@ -21,7 +21,7 @@ use super::Library;
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct ArrayLibrary<'name, const N: usize> {
-	pub regs: [luaL_Reg; N],
+	regs: [luaL_Reg; N],
 	terminator: luaL_Reg,
 	_life: PhantomData<&'name CStr>,
 }
