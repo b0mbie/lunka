@@ -14,7 +14,7 @@ fn luaopen_os2(lua: &mut LuaThread) -> LuaRets {
 	1.into()
 }
 
-const LIBRARY: LuaLibrary = library! {
+const LIBRARY: LuaLibrary = lua_library! {
 	metadata: l_metadata,
 };
 

@@ -5,7 +5,7 @@ lua_export_fn!(luaopen_hello => |lua| {
 	1
 });
 
-const LIBRARY: LuaLibrary = library! {
+const LIBRARY: LuaLibrary = lua_library! {
 	hello: l_hello,
 };
 

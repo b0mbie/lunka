@@ -6,7 +6,7 @@ pub use crate::{
 	cdef::auxlib::luaL_Reg as LuaReg,
 	AuxOptions as LuaAuxOptions,
 	StaticLibrary as LuaLibrary,
-	library,
+	library as lua_library,
 };
 
 pub use crate::{
@@ -33,7 +33,7 @@ pub use crate::{
 	Lua,
 	Coroutine as LuaCoroutine,
 	Thread as LuaThread,
-	Func as LuaFunc, func,
+	Func as LuaFunc, func as lua_func,
 	Ctx as LuaCtx, Rets as LuaRets,
 	fmt_error as lua_fmt_error,
 	push_fmt_string as lua_push_fmt_string,
