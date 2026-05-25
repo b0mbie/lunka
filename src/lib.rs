@@ -12,6 +12,7 @@ extern crate alloc;
 pub mod errors {}
 
 pub mod cdef;
+pub mod prelude;
 
 #[cfg(feature = "auxlib")]
 mod auxlib;
@@ -21,13 +22,16 @@ mod coroutine;
 pub use coroutine::*;
 mod dbg_what;
 pub use dbg_what::*;
+mod exporting;
+pub use exporting::*;
+mod func;
+pub use func::*;
 mod gc_mode;
 pub use gc_mode::*;
 mod indices;
 pub use indices::*;
 mod managed;
 pub use managed::*;
-pub mod prelude;
 mod state;
 pub use state::*;
 mod thread;

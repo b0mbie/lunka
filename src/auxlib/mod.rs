@@ -18,10 +18,10 @@ use crate::{
 
 mod buffer;
 pub use buffer::*;
+mod library;
+pub use library::*;
 mod options;
 pub use options::*;
-mod reg;
-pub use reg::*;
 
 impl Thread {
 	/// Raise an error reporting a problem with argument arg of the C function
@@ -437,34 +437,6 @@ impl Managed<'_> {
 		) }
 	}
 
-	/// Create a new table and register there the functions in the list `library`.
-	/// 
-	/// _Unlike_ this function's C counterpart, this will _not_ call
-	/// [`Thread::check_version`].
-	/// 
-	/// # Errors
-	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn new_lib<const N: usize>(&mut self, library: &Library<'_, N>) {
-		unsafe {
-			let l = self.as_ptr();
-			lua_createtable(l, 0, N as _);
-			luaL_setfuncs(l, library.as_ptr(), 0);
-		}
-	}
-
-	/// Create a new table with a size optimized to store all entries in
-	/// `library`, but does not actually store them.
-	/// 
-	/// This function is intended to be used in conjunction with
-	/// [`Managed::set_funcs`].
-	/// 
-	/// # Errors
-	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn new_lib_table<const N: usize>(&mut self, library: &Library<'_, N>) {
-		let _ = library;
-		unsafe { lua_createtable(self.as_ptr(), 0, N as _) }
-	}
-
 	/// If the registry already doesn't have the key `table_name`, create a new
 	/// table to be used as a metatable for userdata and return `true`.
 	/// Otherwise, return `false`.
@@ -502,25 +474,6 @@ impl Managed<'_> {
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn create_ref(&mut self, store_index: c_int) -> c_int {
 		unsafe { luaL_ref(self.as_ptr(), store_index) }
-	}
-
-	/// Registers all functions in the list `library` into the table on the top
-	/// of the stack (below optional upvalues).
-	/// 
-	/// When `n_upvalues` is not zero, all functions are created with
-	/// `n_upvalues` upvalues, initialized with copies of the values previously
-	/// pushed on the stack on top of the library table.
-	/// These values are popped from the stack after the registration.
-	/// 
-	/// See also [`Library`].
-	/// 
-	/// A value with a `None` value represents a placeholder, which is filled
-	/// with `false`.
-	/// 
-	/// # Errors
-	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn set_funcs<const N: usize>(&mut self, library: &Library<'_, N>, n_upvalues: u8) {
-		unsafe { luaL_setfuncs(self.as_ptr(), library.as_ptr(), n_upvalues as _) }
 	}
 
 	/// Create and push a traceback of the stack of thread `of`.

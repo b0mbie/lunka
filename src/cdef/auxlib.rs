@@ -28,7 +28,6 @@ pub const LOADED_TABLE: &CStr = c"_LOADED";
 pub const PRELOAD_TABLE: &CStr = c"_PRELOAD";
 
 /// Type for arrays of functions to be registered by [`luaL_setfuncs`].
-/// Also known as `luaL_Reg`.
 /// 
 /// [`luaL_Reg::name`] is the function name and
 /// [`luaL_Reg::func`] is a pointer to the function.

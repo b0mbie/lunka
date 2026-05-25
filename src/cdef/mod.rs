@@ -128,12 +128,11 @@ pub use dependent::Unsigned;
 pub use dependent::Number;
 
 /// Type of the context used for continuation functions.
-/// Also known as `lua_KContext`.
 /// 
 /// The original Lua C header uses `ptrdiff_t` or `intptr_t`.
 /// Those types are practically the same, even though the intention for using
 /// them differs. The closest analogue to those is [`isize`].
-pub type KContext = isize;
+pub type lua_KContext = isize;
 
 /// Size limit for the Lua stack.
 /// This cannot be changed for Lua that's already compiled.
@@ -206,7 +205,6 @@ macro_rules! c_int_enum {
 		}
 	};
 }
-pub(crate) use c_int_enum;
 
 c_int_enum! {
 	/// Lua status code enumeration.
@@ -382,7 +380,7 @@ pub type lua_CFunction = unsafe extern "C-unwind" fn(l: *mut lua_State) -> c_int
 /// 
 /// `status` is generally also a valid [`Status`].
 pub type lua_KFunction = unsafe extern "C-unwind" fn(
-	l: *mut lua_State, status: c_int, ctx: KContext
+	l: *mut lua_State, status: c_int, ctx: lua_KContext
 ) -> c_int;
 
 /// Function that reads blocks when loading Lua chunks.
@@ -675,13 +673,13 @@ unsafe extern "C-unwind" {
 		pub fn lua_callk(
 			self,
 			n_args: c_int, n_results: c_int,
-			ctx: KContext, k: Option<lua_KFunction>
+			ctx: lua_KContext, k: Option<lua_KFunction>
 		);
 		pub fn lua_pcallk(
 			self,
 			n_args: c_int, n_results: c_int,
 			err_func: c_int,
-			ctx: KContext, k: Option<lua_KFunction>
+			ctx: lua_KContext, k: Option<lua_KFunction>
 		) -> c_int;
 		pub fn lua_load(
 			self,
@@ -708,7 +706,7 @@ unsafe extern "C-unwind" {
 		pub fn lua_yieldk(
 			self,
 			n_results: c_int,
-			ctx: KContext, k: Option<lua_KFunction>
+			ctx: lua_KContext, k: Option<lua_KFunction>
 		) -> !;
 
 		/// # Note
@@ -726,7 +724,7 @@ unsafe extern "C-unwind" {
 		pub fn lua_yieldk_in_hook(
 			self,
 			n_results: c_int,
-			ctx: KContext, k: Option<lua_KFunction>
+			ctx: lua_KContext, k: Option<lua_KFunction>
 		) -> c_int;
 
 		pub fn lua_resume(

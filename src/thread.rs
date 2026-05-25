@@ -93,8 +93,8 @@ macro_rules! lua_is {
 /// indices. This model simply utilizes checks done at compile time to ensure
 /// safety.
 /// 
-/// # Memory layout
-/// This type has the same in-memory representation as [`lua_State`];
+/// # Layout
+/// This type has the same layout and ABI as [`lua_State`];
 /// however, it is always used behind a reference.
 #[derive(Debug)]
 #[repr(transparent)]
@@ -421,8 +421,7 @@ impl Thread {
 		unsafe { lua_pushboolean(self.as_ptr_no_gc(), if value { 1 } else { 0 }) }
 	}
 
-	/// Push a light C function onto the stack (that is, a C function with no
-	/// upvalues).
+	/// Push a light C function onto the stack (that is, a C function with no upvalues).
 	/// 
 	/// See also [`Managed::push_c_closure`].
 	pub fn push_c_function(&self, func: lua_CFunction) {
@@ -804,7 +803,7 @@ impl Thread {
 	/// reachable.
 	pub unsafe fn yield_k_with(
 		&self, n_results: c_int,
-		continuation: lua_KFunction, context: KContext
+		continuation: lua_KFunction, context: lua_KContext
 	) -> ! {
 		unsafe { lua_yieldk(self.as_ptr_no_gc(), n_results, context, Some(continuation)) }
 	}
@@ -823,7 +822,7 @@ impl Thread {
 	/// This function should be called *only* inside of hooks.
 	pub unsafe fn yield_in_hook_k_with(
 		&self, n_results: c_int,
-		continuation: lua_KFunction, context: KContext
+		continuation: lua_KFunction, context: lua_KContext
 	) {
 		unsafe { lua_yieldk_in_hook(
 			self.as_ptr_no_gc(), n_results,

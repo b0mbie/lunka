@@ -127,7 +127,7 @@ impl Managed<'_> {
 	pub unsafe fn call_k(
 		&mut self,
 		n_args: c_uint, n_results: c_int,
-		continuation: lua_KFunction, context: KContext,
+		continuation: lua_KFunction, context: lua_KContext,
 	) {
 		unsafe { lua_callk(
 			self.l,
@@ -730,7 +730,7 @@ impl Managed<'_> {
 		&mut self,
 		n_args: c_uint, n_results: c_int,
 		err_func: c_int,
-		continuation: lua_KFunction, context: KContext
+		continuation: lua_KFunction, context: lua_KContext
 	) -> Status {
 		unsafe { Status::from_c_int_unchecked(lua_pcallk(
 			self.l,

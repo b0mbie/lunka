@@ -1,10 +1,21 @@
-//! "Hello, world!" example running in Lua.
-
-use core::ffi::c_int;
 use lunka::prelude::*;
 
-unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
-	let lua = unsafe { LuaThread::from_ptr_mut(l) };
+fn main() {
+	let mut lua = Lua::new();
+
+	let mut mg = lua.managed();
+	mg.push_function(l_main);
+	let did_run_ok = if unsafe { mg.pcall(0, 1, 0).is_ok() } {
+		mg.to_boolean(-1)
+	} else {
+		false
+	};
+	if !did_run_ok {
+		panic!("couldn't run \"Hello, world!\" example for some reason");
+	}
+}
+
+extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 	lua.managed().open_libs();
 
 	let is_ok = lua.managed().load_string(
@@ -20,7 +31,7 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 		};
 		eprintln!("couldn't load example Lua code:\n\t{error}");
 		lua.push_boolean(false);
-		return 1
+		return 1.into()
 	}
 
 	let is_ok = unsafe { lua.managed().pcall(0, 0, 0).is_ok() };
@@ -33,24 +44,9 @@ unsafe extern "C-unwind" fn l_main(l: *mut LuaState) -> c_int {
 		};
 		eprintln!("couldn't run example Lua code:\n\t{error}");
 		lua.push_boolean(false);
-		return 1
+		return 1.into()
 	}
 
 	lua.push_boolean(true);
-	1
-}
-
-fn main() {
-	let mut lua = Lua::new();
-
-	let mut mg = lua.managed();
-	mg.push_c_function(l_main);
-	let did_run_ok = if unsafe { mg.pcall(0, 1, 0).is_ok() } {
-		mg.to_boolean(-1)
-	} else {
-		false
-	};
-	if !did_run_ok {
-		panic!("couldn't run \"Hello, world!\" example for some reason");
-	}
+	1.into()
 }

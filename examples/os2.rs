@@ -1,15 +1,24 @@
-//! Example library that demonstrates the exposing of some Rust functionality to
-//! Lua in an importable library.
+//! Example library that demonstrates
+//! the exposing of some Rust functionality to Lua
+//! in an importable library.
 
 use lunka::prelude::*;
 use std::{
-	ffi::c_int,
 	fs::metadata,
 	time::SystemTime,
 };
 
-unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {	
-	let lua = unsafe { LuaThread::from_ptr_mut(l) };
+lua_export_fn!(luaopen_os2);
+fn luaopen_os2(lua: &mut LuaThread) -> LuaRets {
+	lua.managed().new_lib(&LIBRARY);
+	1.into()
+}
+
+const LIBRARY: LuaLibrary = library! {
+	metadata: l_metadata,
+};
+
+extern "C-unwind" fn l_metadata(mut lua: LuaCtx<'_>) -> LuaRets {
 	let path = lua.check_string(1);
 	
 	let meta = match metadata(String::from_utf8_lossy(path).as_ref()) {
@@ -17,7 +26,7 @@ unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {
 		Err(error) => {
 			lua.push_fail();
 			lua.managed().push_display(&error);
-			return 2
+			return 2.into()
 		}
 	};
 
@@ -45,16 +54,5 @@ unsafe extern "C-unwind" fn l_metadata(l: *mut LuaState) -> c_int {
 		unsafe { mg.set_field(-2, c"modified") };
 	}
 
-	1
-}
-
-const LIBRARY: LuaLibrary<1> = library! {
-	metadata: l_metadata
-};
-
-#[unsafe(no_mangle)]
-unsafe extern "C-unwind" fn luaopen_os2(l: *mut LuaState) -> c_int {
-	let lua = unsafe { LuaThread::from_ptr_mut(l) };
-	lua.managed().new_lib(&LIBRARY);
-	1
+	1.into()
 }
