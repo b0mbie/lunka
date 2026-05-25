@@ -5,6 +5,7 @@ use core::ffi::c_int;
 /// This structure is used for [`Thread::switch_gc_to`](crate::Thread::switch_gc_to).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GcMode {
+	/// Incremental mode.
 	Incremental {
 		/// How long the collector should wait before starting a new cycle.
 		/// Default is `200`, maximum is `1000`
@@ -42,6 +43,7 @@ pub enum GcMode {
 		/// (non-incremental) collector.
 		step_size: c_int,
 	},
+	/// Generational mode.
 	Generational {
 		/// Frequency of minor collections.
 		/// Default is `20`, maximum is `200`.
