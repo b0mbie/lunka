@@ -173,7 +173,7 @@ impl Thread {
 	/// then this guarantee is not broken.
 	pub unsafe fn managed_no_gc(&self) -> Managed<'_> {
 		Managed {
-			l: unsafe { self.as_ptr_inspect() },
+			l: unsafe { self.as_ptr_no_gc() },
 			_life: PhantomData
 		}
 	}
