@@ -29,7 +29,8 @@ pub unsafe trait Library {
 	fn length(&self) -> usize;
 	/// Returns a pointer to an array of [`luaL_Reg`] terminated with [`luaL_Reg::NULL`].
 	/// 
-	/// Its length is indicated by the value returned by
+	/// The array is valid for reads for the lifetime of `self`,
+	/// and its length is indicated by the value returned by
 	/// [`Library::length`] of the implementing type.
 	fn as_ptr(&self) -> *const luaL_Reg;
 }
