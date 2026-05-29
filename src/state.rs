@@ -1,7 +1,5 @@
 use core::{
-	ffi::{
-		CStr, c_int, c_void,
-	},
+	ffi::c_void,
 	ops::{
 		Deref, DerefMut,
 	},
@@ -10,25 +8,11 @@ use core::{
 use crate::{
 	cdef::*,
 	Thread,
+	Ctx, Rets,
 };
 
 #[cfg(feature = "auxlib")]
 use crate::cdef::auxlib::*;
-
-/// Panic function that's similar to the panic function defined in `lauxlib.h`.
-/// 
-/// # Safety
-/// `l` must be a valid pointer to a Lua state.
-pub unsafe extern "C-unwind" fn lua_panic_handler(l: *mut lua_State) -> c_int {
-	let msg_ptr = unsafe { lua_tostring(l, -1) };
-	let msg = if !msg_ptr.is_null() {
-		let msg = unsafe { CStr::from_ptr(msg_ptr) };
-		msg.to_str().unwrap_or("error object does not contain valid UTF-8")
-	} else {
-		"error object is not a string"
-	};
-	panic!("unprotected error in call to Lua API ({msg})")
-}
 
 /// Data structure that represents a main Lua thread.
 /// 

@@ -163,3 +163,17 @@ macro_rules! func {
 		}
 	};
 }
+
+/// Panic function that delegates to [`panic!`].
+/// 
+/// # Safety
+/// `l` must be a valid pointer to a Lua state.
+pub extern "C-unwind" fn rust_panic_handler(mut lua: Ctx<'_>) -> Rets {
+	let mut lua = lua.managed();
+	let msg = if let Some(msg) = lua.to_string(-1) {
+		str::from_utf8(msg).unwrap_or("error object does not contain valid UTF-8")
+	} else {
+		"error object is not a string"
+	};
+	panic!("unprotected error in call to Lua API ({msg})")
+}

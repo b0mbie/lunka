@@ -3,7 +3,7 @@ use lunka::prelude::*;
 fn main() {
 	std::panic::catch_unwind(move || {
 		let mut lua = Lua::new();
-		lua.at_panic(Some(lunka::lua_panic_handler));
+		lua.at_panic(Some(lunka::rust_panic_handler));
 		lua.push_function(lua_func!(lua => {
 			struct Guard;
 			impl Drop for Guard {
