@@ -8,7 +8,6 @@ use core::{
 use crate::{
 	cdef::*,
 	Thread,
-	Ctx, Rets,
 };
 
 #[cfg(feature = "auxlib")]
