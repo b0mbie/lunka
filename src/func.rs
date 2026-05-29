@@ -145,7 +145,7 @@ macro_rules! func {
 	($lua:pat => {$($t:tt)*}) => {{
 		extern "C-unwind" fn __lua_func_inner(cx: $crate::Ctx<'_>) -> $crate::Rets {
 			let $lua = cx.lua();
-			<$crate::Rets as ::core::convert::From<_>>::from({$($t)*})
+			<$crate::Rets as ::core::convert::From<_>>::from((move || {$($t)*})())
 		}
 		__lua_func_inner
 	}};
