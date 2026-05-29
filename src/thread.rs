@@ -210,7 +210,7 @@ impl Thread {
 	}
 
 	/// Set a new panic function and return the old one.
-	pub fn at_panic(&self, func: Option<lua_CFunction>) -> Option<lua_CFunction> {
+	pub fn at_c_panic(&self, func: Option<lua_CFunction>) -> Option<lua_CFunction> {
 		unsafe { lua_atpanic(self.as_ptr_no_gc(), func) }
 	}
 

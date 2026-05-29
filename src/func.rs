@@ -15,6 +15,13 @@ use crate::{
 };
 
 impl Thread {
+	/// Set a new panic function and return the old one.
+	/// 
+	/// This returns an optional [`lua_CFunction`] - not [`Func`].
+	pub fn at_panic(&self, func: Option<Func>) -> Option<lua_CFunction> {
+		self.at_c_panic(func.map(to_c_function))
+	}
+
 	/// Push a light function onto the stack (that is, a function with no upvalues).
 	pub fn push_function(&self, f: Func) {
 		self.push_c_function(to_c_function(f))
