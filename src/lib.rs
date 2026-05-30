@@ -18,6 +18,7 @@ pub mod prelude;
 
 #[cfg(feature = "auxlib")]
 mod auxlib;
+#[cfg(feature = "auxlib")]
 pub use auxlib::*;
 
 mod coroutine;
