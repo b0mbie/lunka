@@ -12,14 +12,22 @@ fn main() {
 				}
 			}
 
-			// May or may not be dropped!
-			#[allow(unused_variables)]
 			let guard = Guard;
 
-			if true {
-				lua.error_c_str(c"uh oh!");
+			// `uh_oh` will always raise a Lua error, which will always diverge.
+			// However, it is impossible for the compiler to know about this;
+			// `guard` may be dropped on some platforms, but that may not be the case on others!
+			unsafe {
+				lua.push_function(uh_oh);
+				lua.managed().call(0, 0);
 			}
+
+			drop(guard);
 		}));
 		unsafe { lua.managed().call(0, 0) }
 	}).unwrap_err();
+}
+
+extern "C-unwind" fn uh_oh(lua: LuaCtx<'_>) -> LuaRets {
+	lua.error_c_str(c"uh oh!")
 }
