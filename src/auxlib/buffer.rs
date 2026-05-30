@@ -7,7 +7,6 @@ use core::{
 	},
 	marker::PhantomData,
 	mem::MaybeUninit,
-	slice::from_raw_parts,
 };
 
 use crate::{
@@ -151,19 +150,12 @@ impl<'l> Buffer<'l> {
 
 	/// Add a string to the buffer.
 	/// 
-	/// # Errors
-	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn add_string<S: AsRef<[u8]>>(&mut self, data: S) {
-		self.add_c_chars(bytes_to_c_chars(data.as_ref()))
-	}
-
-	/// Add an array of C characters to the buffer.
-	/// 
 	/// Functionally equivalent to the function [`luaL_addlstring`].
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
-	pub fn add_c_chars(&mut self, data: &[c_char]) {
+	pub fn add_string<S: AsRef<[u8]>>(&mut self, data: S) {
+		let data = data.as_ref();
 		unsafe { luaL_addlstring(
 			&mut self.raw,
 			data.as_ptr() as *const _, data.len(),
@@ -187,13 +179,6 @@ impl<'l> Buffer<'l> {
 	pub fn add_value(&mut self) {
 		unsafe { luaL_addvalue(&mut self.raw) }
 	}
-}
-
-const fn bytes_to_c_chars(b: &[u8]) -> &[c_char] {
-	unsafe { from_raw_parts(
-		b.as_ptr() as *const c_char,
-		size_of_val(b) / size_of::<c_char>(),
-	) }
 }
 
 impl fmt::Write for Buffer<'_> {

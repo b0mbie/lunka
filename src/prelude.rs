@@ -29,7 +29,7 @@ pub use crate::{
 		DEFAULT_ID_SIZE as LUA_DEFAULT_ID_SIZE,
 		lua_upvalueindex as lua_upvalue_index
 	},
-	dbg_what::DebugWhat as LuaDebugWhat,
+	DebugFlags as LuaDebugFlags,
 	Lua,
 	Coroutine as LuaCoroutine,
 	Thread as LuaThread,

@@ -343,8 +343,10 @@ impl Managed<'_> {
 	/// it is valid at least until the call to its finalizer.
 	/// The returned pointer must only be used while it's valid.
 	/// 
-	/// Lua makes no guarantees about the alignment of the pointer.
-	/// It depends entirely on the allocator function used.
+	/// Lua makes no guarantees about the alignment of the pointer -
+	/// it depends entirely on the allocator function used.
+	/// However, generally, the maximum alignment for
+	/// a type that can be written is [`MAX_ALIGN`].
 	pub unsafe fn new_userdata_raw(
 		&mut self,
 		size: usize,
@@ -530,12 +532,7 @@ impl Managed<'_> {
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn to_c_str(&mut self, index: c_int) -> Option<&CStr> {
-		let str_ptr = unsafe { lua_tostring(self.as_ptr(), index) };
-		if !str_ptr.is_null() {
-			Some(unsafe { CStr::from_ptr(str_ptr) })
-		} else {
-			None
-		}
+		unsafe { crate::util::opt_c_str(lua_tostring(self.as_ptr(), index)) }
 	}
 
 	/// Convert the Lua value at the given index to a slice of [`u8`]s,

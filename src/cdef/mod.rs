@@ -25,9 +25,7 @@ use core::{
 	hash::{
 		Hash, Hasher,
 	},
-	ptr::{
-		null_mut, null,
-	},
+	ptr::null_mut,
 };
 
 #[cfg(feature = "auxlib")]
@@ -441,47 +439,27 @@ pub const DEFAULT_ID_SIZE: usize = 60;
 /// This structure is used in Lua debug hooks, and has some private data.
 /// The size of this structure in C code depends on the `LUA_IDSIZE` macro,
 /// however that can always be changed, so a generic const is used here instead.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct lua_Debug<const ID_SIZE: usize = DEFAULT_ID_SIZE> {
 	pub event: c_int,
 	pub name: *const c_char,
-	pub name_what: *const c_char,
+	pub namewhat: *const c_char,
 	pub what: *const c_char,
-	pub source: *const c_char, pub source_len: usize,
-	pub current_line: c_int,
-	pub line_defined: c_int, pub last_line_defined: c_int,
-	pub n_upvalues: c_uchar,
-	pub n_params: c_uchar,
-	pub is_vararg: c_char,
-	pub is_tail_call: c_char,
-	pub first_transferred: c_ushort,
-	pub n_transferred: c_ushort,
+	pub source: *const c_char,
+	pub srclen: usize,
+	pub currentline: c_int,
+	pub linedefined: c_int,
+	pub lastlinedefined: c_int,
+	pub nups: c_uchar,
+	pub nparams: c_uchar,
+	pub isvararg: c_char,
+	pub istailcall: c_char,
+	pub ftransfer: c_ushort,
+	pub ntransfer: c_ushort,
 	pub short_src: [c_char; ID_SIZE],
 	// This is used internally.
-	pub active_function: *const c_void,
-}
-
-impl<const ID_SIZE: usize> lua_Debug<ID_SIZE> {
-	pub const fn zeroed() -> Self {
-		Self {
-			event: 0,
-			name: null(),
-			name_what: null(),
-			what: null(),
-			source: null(), source_len: 0,
-			current_line: -1,
-			line_defined: -1, last_line_defined: -1,
-			n_upvalues: 0,
-			n_params: 0,
-			is_vararg: 0,
-			is_tail_call: 0,
-			first_transferred: 0,
-			n_transferred: 0,
-			short_src: [0; ID_SIZE],
-			active_function: null()
-		}
-	}
+	pub i_ci: *const c_void,
 }
 
 /// Function to be called by the Lua debugger in specific events.
@@ -786,8 +764,8 @@ unsafe extern "C-unwind" {
 		pub fn lua_getinfo(self, what: *const c_char, ar: *mut lua_Debug<DEFAULT_ID_SIZE>) -> c_int;
 		pub fn lua_getlocal(self, ar: *const lua_Debug<DEFAULT_ID_SIZE>, n: c_int) -> *const c_char;
 		pub fn lua_setlocal(self, ar: *const lua_Debug<DEFAULT_ID_SIZE>, n: c_int) -> *const c_char;
-		pub fn lua_sethook(self, func: lua_Hook<DEFAULT_ID_SIZE>, mask: c_int, count: c_int);
-		pub fn lua_gethook(self) -> lua_Hook<DEFAULT_ID_SIZE>;
+		pub fn lua_sethook(self, func: Option<lua_Hook<DEFAULT_ID_SIZE>>, mask: c_int, count: c_int);
+		pub fn lua_gethook(self) -> Option<lua_Hook<DEFAULT_ID_SIZE>>;
 	}
 }
 
@@ -983,153 +961,31 @@ pub unsafe fn lua_replace(l: *mut lua_State, idx: c_int) {
 	}
 }
 
-c_int_enum! {
-	/// Lua event code enumeration.
-	/// 
-	/// This is used in Lua debug hooks.
-	#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-	pub enum Event {
-		Call = 0,
-		Return = 1,
-		Line = 2,
-		Count = 3,
-		TailCall = 4,
-	}
-}
-
-/// Structure representing a Lua event mask.
-/// 
-/// This is used in Lua debug hooks.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Lua event code for debug hooks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct HookMask {
-	mask: c_int
+pub struct Event(pub c_int);
+impl Event {
+	pub const CALL: Self = Self(0);
+	pub const RETURN: Self = Self(1);
+	pub const LINE: Self = Self(2);
+	pub const COUNT: Self = Self(3);
+	pub const TAIL_CALL: Self = Self(4);
 }
 
-impl HookMask {
-	pub const INT_CALL: c_int = 1 << Event::Call as c_int;
-	pub const INT_RETURN: c_int = 1 << Event::Return as c_int;
-	pub const INT_LINE: c_int = 1 << Event::Line as c_int;
-	pub const INT_COUNT: c_int = 1 << Event::Count as c_int;
-
-	/// Construct a [`HookMask`] with no events that are listened for.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(HookMask::empty().into_c_int(), 0);
-	/// ```
-	pub const fn empty() -> Self {
-		Self {
-			mask: 0
-		}
-	}
-
-	/// Create an instance of this structure using an already-known integer mask.
-	/// 
-	/// # Safety
-	/// The mask must be valid for [`lua_sethook`].
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// unsafe {
-	/// 	assert_eq!(HookMask::from_c_int_unchecked(0), HookMask::empty());
-	/// }
-	/// ```
-	pub const unsafe fn from_c_int_unchecked(mask: c_int) -> Self {
-		Self {
-			mask
-		}
-	}
-
-	/// Create an instance of this structure using an already-known integer mask,
-	/// and process the mask to only have bits that are valid.
-	pub const fn from_c_int(mask: c_int) -> Self {
-		Self {
-			mask: mask & (
-				Self::INT_CALL | Self::INT_RETURN |
-				Self::INT_LINE | Self::INT_COUNT
-			)
-		}
-	}
-
-	/// Consume this structure and return its underlying mask integer.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(HookMask::empty().into_c_int(), 0);
-	/// ```
-	pub const fn into_c_int(self) -> c_int {
-		self.mask
-	}
-
-	/// Consume this structure, including in it a flag for function calls.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(
-	/// 	HookMask::empty().with_calls().into_c_int(),
-	/// 	HookMask::INT_CALL
-	/// );
-	/// ```
-	pub const fn with_calls(self) -> Self {
-		Self {
-			mask: self.mask | Self::INT_CALL
-		}
-	}
-
-	/// Consume this structure, including in it a flag for function returns.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(
-	/// 	HookMask::empty().with_returns().into_c_int(),
-	/// 	HookMask::INT_RETURN
-	/// );
-	/// ```
-	pub const fn with_returns(self) -> Self {
-		Self {
-			mask: self.mask | Self::INT_RETURN
-		}
-	}
-
-	/// Consume this structure, including in it a flag for advancing lines.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(
-	/// 	HookMask::empty().with_lines().into_c_int(),
-	/// 	HookMask::INT_LINE
-	/// );
-	/// ```
-	pub const fn with_lines(self) -> Self {
-		Self {
-			mask: self.mask | Self::INT_LINE
-		}
-	}
-
-	/// Consume this structure, including in it a flag for advancing
-	/// instructions.
-	/// 
-	/// # Examples
-	/// ```
-	/// use lunka::cdef::HookMask;
-	/// assert_eq!(
-	/// 	HookMask::empty().with_instructions().into_c_int(),
-	/// 	HookMask::INT_COUNT
-	/// );
-	/// ```
-	/// instructions.
-	pub const fn with_instructions(self) -> Self {
-		Self {
-			mask: self.mask | Self::INT_COUNT
-		}
-	}
+/// Lua event mask for debug hooks.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct EventMask(pub c_int);
+impl EventMask {
+	/// Function calls.
+	pub const CALL: Self = Self(1 << Event::CALL.0);
+	/// Function returns.
+	pub const RETURN: Self = Self(1 << Event::RETURN.0);
+	/// Advancing lines.
+	pub const LINE: Self = Self(1 << Event::LINE.0);
+	/// Advancing a certain number of instructions.
+	pub const COUNT: Self = Self(1 << Event::COUNT.0);
 }
 
 /// Type that ensures maximum alignment for all of its fields.

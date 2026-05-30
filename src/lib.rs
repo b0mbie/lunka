@@ -6,6 +6,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+pub(crate) mod util;
+
 #[cfg(any(doc, doctest))]
 #[allow(rustdoc::redundant_explicit_links)]
 #[doc = include_str!("../doc/errors.md")]
@@ -20,8 +22,8 @@ pub use auxlib::*;
 
 mod coroutine;
 pub use coroutine::*;
-mod dbg_what;
-pub use dbg_what::*;
+mod debug;
+pub use debug::*;
 mod exporting;
 pub use exporting::*;
 mod func;
