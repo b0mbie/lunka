@@ -8,7 +8,7 @@ fn main() {
 		($fill:expr, $target:expr) => {{
 			lua.push_buffer($fill);
 			assert_eq!(lua.to_string(-1), Some($target.as_ref()));
-			unsafe { lua.pop(1) };
+			lua.pop(1);
 		}};
 	}
 

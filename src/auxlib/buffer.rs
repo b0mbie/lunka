@@ -196,18 +196,18 @@ impl fmt::Write for Buffer<'_> {
 }
 
 impl Managed<'_> {
-	/// Fill a [`Buffer`]
+	/// Fills a [`Buffer`]
 	/// with the given closure
-	/// and push it onto the stack.
+	/// and pushes it onto the stack.
 	pub fn push_buffer<F: FnOnce(&mut Buffer<'_>)>(&mut self, f: F) {
 		let mut buffer = Buffer::new(self);
 		f(&mut buffer);
 		buffer.finish()
 	}
 
-	/// Fill a [`Buffer`] of a known capacity
+	/// Fills a [`Buffer`] of a known capacity
 	/// with the given closure
-	/// and push it onto the stack.
+	/// and pushes it onto the stack.
 	pub fn push_buffer_with_capacity<F: FnOnce(&mut Buffer<'_>)>(&mut self, capacity: usize, f: F) {
 		let mut buffer = Buffer::with_capacity(self, capacity);
 		f(&mut buffer);

@@ -17,7 +17,7 @@ fn main() -> ExitCode {
 	let mut lua = Lua::new();
 
 	lua.push_function(l_main);
-	let status = unsafe { lua.managed().pcall(0, 1, 0) };
+	let status = lua.managed().pcall(0, 1, 0);
 	let is_ok = lua.to_boolean(-1);
 	report(&mut lua, status);
 
@@ -57,7 +57,7 @@ extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 
 	let mut mg = lua.managed();
 	mg.restart_gc();
-	let run_status = unsafe { mg.pcall(arg_count, 0, base) };
+	let run_status = mg.pcall(arg_count, 0, base);
 	mg.stop_gc();
 	if !report(&mut lua, run_status) {
 		return 0.into()
@@ -75,7 +75,7 @@ extern "C-unwind" fn l_err_handler(mut lua: LuaCtx<'_>) -> LuaRets {
 		}
 	}
 
-	let ok = unsafe { lua.managed().call_metamethod(1, c"__tostring") };
+	let ok = lua.managed().call_metamethod(1, c"__tostring");
 	if ok && lua.type_of(-1) == LuaType::String {
 		return 1.into()
 	}
@@ -90,7 +90,7 @@ fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 		if let Some(message) = lua.managed().to_c_str(-1) {
 			c_eprintln(message);
 		}
-		unsafe { lua.managed().pop(1) };
+		lua.managed().pop(1);
 		false
 	} else {
 		true

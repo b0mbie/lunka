@@ -1,9 +1,10 @@
 //! See [`Thread`].
 
 use crate::{
-	GcMode,
 	cdef::*,
 	managed::*,
+	util::lunka_attrs,
+	GcMode,
 	AbsIndex, ValidIndex, AcceptableIndex,
 };
 
@@ -59,8 +60,7 @@ macro_rules! lua_is {
 	};
 }
 
-/// Opaque type that represents a Lua thread, which is used by
-/// [`Lua`](crate::Lua) and other structures.
+/// Lua thread.
 /// 
 /// This type can never have an instance made of it; there can only be
 /// references to this type, which are the only kind of valid value.
@@ -100,7 +100,7 @@ pub struct Thread {
 }
 
 impl Thread {
-	/// Construct a reference to [`Thread`] from a raw C pointer to a Lua state.
+	/// Constructs a reference to [`Thread`] from a raw C pointer to a Lua state.
 	/// 
 	/// # Safety
 	/// `l` must point to a valid Lua state (`lua_State *` in C), for the
@@ -109,7 +109,7 @@ impl Thread {
 		unsafe { &*(l as *mut Self) }
 	}
 
-	/// Construct a _mutable_ reference to [`Thread`] from a raw C pointer to a
+	/// Constructs a _mutable_ reference to [`Thread`] from a raw C pointer to a
 	/// Lua state.
 	/// 
 	/// # Safety
@@ -124,12 +124,12 @@ impl Thread {
 		unsafe { &mut *(l as *mut Self) }
 	}
 
-	/// Return the raw C pointer that represents the underlying Lua state.
+	/// Returns the raw C pointer that represents the underlying Lua state.
 	pub fn as_ptr(&mut self) -> *mut lua_State {
 		self.raw.get()
 	}
 
-	/// Return the raw C pointer that represents the underlying Lua state.
+	/// Returns the raw C pointer that represents the underlying Lua state.
 	/// 
 	/// # Safety
 	/// The returned pointer must only be used for *inspecting* the state.
@@ -137,7 +137,7 @@ impl Thread {
 		self.raw.get()
 	}
 
-	/// Return the raw C pointer that represents the underlying Lua state.
+	/// Returns the raw C pointer that represents the underlying Lua state.
 	/// 
 	/// # Safety
 	/// The returned pointer must only be used for actions that wouldn't invalidate earlier references.
@@ -148,7 +148,7 @@ impl Thread {
 		self.raw.get()
 	}
 
-	/// Return a context that allows to run code
+	/// Returns a context that allows to run code
 	/// that can restart the GC and potentially invalidate pointers.
 	pub fn managed(&mut self) -> Managed<'_> {
 		Managed {
@@ -175,7 +175,7 @@ impl Thread {
 		}
 	}
 
-	/// Close all active to-be-closed variables in the main thread, release all
+	/// Closes all active to-be-closed variables in the main thread, release all
 	/// objects (calling the corresponding garbage-collection metamethods, if
 	/// any), and free all dynamic memory used by this [`Thread`].
 	/// 
@@ -186,68 +186,74 @@ impl Thread {
 		unsafe { lua_close(self.as_ptr()) }
 	}
 
-	/// Reset a thread, cleaning its call stack and closing all pending
-	/// to-be-closed variables.
-	/// 
-	/// Returns a status code: [`Status::Ok`] for no errors in the thread
-	/// (either the original error that stopped the thread or errors in closing
-	/// methods), or an error status otherwise.
-	/// 
-	/// In case of error, leaves the error object on the top of its own stack.
-	pub fn close_as_coroutine(&mut self) -> Status {
-		unsafe { Status::from_c_int_unchecked(lua_resetthread(self.as_ptr())) }
+	lunka_attrs! {
+		[runs_code]
+		/// Resets a thread, cleaning its call stack and closing all pending
+		/// to-be-closed variables.
+		/// 
+		/// Returns a status code: [`Status::Ok`] for no errors in the thread
+		/// (either the original error that stopped the thread or errors in closing
+		/// methods), or an error status otherwise.
+		/// 
+		/// In case of error, leaves the error object on the top of its own stack.
+		pub fn close_as_coroutine(&mut self) -> Status {
+			unsafe { Status::from_c_int_unchecked(lua_resetthread(self.as_ptr())) }
+		}
 	}
 
-	/// This behaves similarly to [`Thread::close_as_coroutine`], but allows to specify `from`,
-	/// which represents the coroutine that is resetting this one.
-	pub fn close_as_coroutine_from(&mut self, from: &Self) -> Status {
-		unsafe { Status::from_c_int_unchecked(
-			lua_closethread(self.as_ptr(), from.as_ptr_no_gc())
-		) }
+	lunka_attrs! {
+		[runs_code]
+		/// This behaves similarly to [`Thread::close_as_coroutine`], but allows to specify `from`,
+		/// which represents the coroutine that is resetting this one.
+		pub fn close_as_coroutine_from(&mut self, from: &Self) -> Status {
+			unsafe { Status::from_c_int_unchecked(
+				lua_closethread(self.as_ptr(), from.as_ptr_no_gc())
+			) }
+		}
 	}
 
-	/// Set a new panic function and return the old one.
+	/// Sets a new panic function and return the old one.
 	pub fn at_c_panic(&self, func: Option<lua_CFunction>) -> Option<lua_CFunction> {
 		unsafe { lua_atpanic(self.as_ptr_no_gc(), func) }
 	}
 
-	/// Raise a Lua error, using the value on the top of the stack as the error object.
+	/// Raises a Lua error, using the value on the top of the stack as the error object.
 	/// 
 	/// This function does a long jump, and therefore never returns.
 	pub fn error(&self) -> ! {
 		unsafe { lua_error(self.as_ptr_no_gc()) }
 	}
 
-	/// Restart the garbage collector.
+	/// Restarts the garbage collector.
 	/// 
 	/// This by itself does not run a collection.
 	pub fn restart_gc(&self) {
 		unsafe { lua_gc(self.as_ptr_no_gc(), GcTask::Restart as _) };
 	}
 
-	/// Stop the garbage collector.
+	/// Stops the garbage collector.
 	pub fn stop_gc(&self) {
 		unsafe { lua_gc(self.as_ptr_no_gc(), GcTask::Stop as _) };
 	}
 
-	/// Return the current amount of memory (in kilobytes) in use by this [`Thread`].
+	/// Returns the current amount of memory (in kilobytes) in use by this [`Thread`].
 	pub fn mem_kbytes(&self) -> c_uint {
 		unsafe { lua_gc(self.as_ptr_inspect(), GcTask::CountKbytes as _) }
 			.clamp(0, c_int::MAX) as _
 	}
 
-	/// Return the remainder of dividing the current amount of bytes of memory in use by this [`Thread`] by `1024`.
+	/// Returns the remainder of dividing the current amount of bytes of memory in use by this [`Thread`] by `1024`.
 	pub fn mem_byte_remainder(&self) -> c_uint {
 		unsafe { lua_gc(self.as_ptr_inspect(), GcTask::CountBytesRem as _) }
 			.clamp(0, c_int::MAX) as _
 	}
 
-	/// Return true if the collector is running (i.e. not stopped).
+	/// Returns true if the collector is running (i.e. not stopped).
 	pub fn is_gc_running(&self) -> bool {
 		(unsafe { lua_gc(self.as_ptr_inspect(), GcTask::IsRunning as _) }) != 0
 	}
 
-	/// Change the collector to either incremental or generational mode (see also [`GcMode`]) with the given parameters.
+	/// Changes the collector to either incremental or generational mode (see also [`GcMode`]) with the given parameters.
 	pub fn switch_gc_to(&mut self, gc: GcMode) {
 		match gc {
 			GcMode::Incremental { pause, step_multiplier, step_size } => unsafe {
@@ -265,13 +271,13 @@ impl Thread {
 		};
 	}
 
-	/// Convert the acceptable index `idx` into an equivalent absolute index
+	/// Converts the acceptable index `idx` into an equivalent absolute index
 	/// (that is, one that does not depend on the stack size).
 	pub fn abs_index(&self, idx: AcceptableIndex) -> Option<AbsIndex> {
 		AbsIndex::new(unsafe { lua_absindex(self.as_ptr_inspect(), idx) })
 	}
 
-	/// Ensure that the stack has space for at least `n` extra elements.
+	/// Ensures that the stack has space for at least `n` extra elements.
 	/// That is, that you can safely push up to `n` values into it.
 	/// 
 	/// Returns `false` if it cannot fulfill the request, either because it
@@ -285,15 +291,15 @@ impl Thread {
 		(unsafe { lua_checkstack(self.as_ptr_inspect(), n as _) }) != 0
 	}
 
-	/// Copy the element at `from_idx` into the valid index `to_idx`, replacing
-	/// the value at that position.
+	/// Copies the element at `from_idx` into the valid index `to_idx`,
+	/// replacing the value at that position.
 	/// 
 	/// Values at other positions are not affected.
 	pub fn copy(&self, from_idx: AcceptableIndex, to_idx: AcceptableIndex) {
 		unsafe { lua_copy(self.as_ptr_inspect(), from_idx, to_idx) }
 	}
 
-	/// Return the memory-allocation function of this [`Thread`] along with the
+	/// Returns the memory-allocation function of this [`Thread`] along with the
 	/// opaque pointer given when the memory-allocator function was set.
 	pub fn get_alloc_fn(&self) -> (lua_Alloc, *mut c_void) {
 		let mut ud = null_mut();
@@ -303,7 +309,7 @@ impl Thread {
 		(alloc_fn, ud)
 	}
 
-	/// Push onto the stack the `n`-th user value associated with the full
+	/// Pushes onto the stack the `n`-th user value associated with the full
 	/// userdata at the given index and returns the type of the pushed value.
 	/// 
 	/// If the userdata does not have that value, push `nil` and return [`Type::None`]. 
@@ -313,14 +319,14 @@ impl Thread {
 		) }
 	}
 
-	/// If the value at the given index has a metatable, push that metatable
-	/// onto the stack and return `true`. Otherwise, push nothing and return
-	/// `false`. 
+	/// If the value at the given index has a metatable, pushes that metatable
+	/// onto the stack and returns `true`.
+	/// Otherwise, pushes nothing and returns `false`. 
 	pub fn get_metatable(&self, obj_index: c_int) -> bool {
 		(unsafe { lua_getmetatable(self.as_ptr_no_gc(), obj_index) }) != 0
 	}
 
-	/// Return the index of the top element in the stack.
+	/// Returns the index of the top element in the stack.
 	/// 
 	/// Because indices start at `1`, this result is equal to the number of
 	/// elements in the stack; in particular, `0` means an empty stack.
@@ -328,8 +334,8 @@ impl Thread {
 		unsafe { lua_gettop(self.as_ptr_inspect()) }
 	}
 
-	/// Move the top element into the given valid index, shifting up the
-	/// elements above that index to open space.
+	/// Moves the top element into the given valid index,
+	/// shifting up the elements above that index to open space.
 	/// 
 	/// This function cannot be called with a pseudo-index, because a
 	/// pseudo-index is not an actual stack position.
@@ -338,66 +344,63 @@ impl Thread {
 	}
 
 	lua_is! {
-		/// Return `true` if the value at the given index is a boolean.
+		/// Returns `true` if the value at the given index is a boolean.
 		pub fn is_boolean(&self, index: AcceptableIndex) -> bool for lua_isboolean -> bool;
 	
-		/// Return `true` if the value at the given index is a C function.
+		/// Returns `true` if the value at the given index is a C function.
 		pub fn is_c_function(&self, index: AcceptableIndex) -> bool
 			for lua_iscfunction -> c_int;
 	
-		/// Return `true` if the value at the given index is a function (either
-		/// C or Lua).
+		/// Returns `true` if the value at the given index is a function (either C or Lua).
 		pub fn is_function(&self, index: AcceptableIndex) -> bool
 			for lua_isfunction -> bool;
 	
-		/// Return `true` if the value at the given index is an integer.
+		/// Returns `true` if the value at the given index is an integer.
 		pub fn is_integer(&self, index: AcceptableIndex) -> bool
 			for lua_isinteger -> c_int;
 	
-		/// Return `true` if the value at the given index is a light userdata.
+		/// Returns `true` if the value at the given index is a light userdata.
 		pub fn is_light_userdata(&self, index: AcceptableIndex) -> bool
 			for lua_islightuserdata -> bool;
 	
-		/// Return `true` if the value at the given index is `nil`.
+		/// Returns `true` if the value at the given index is `nil`.
 		pub fn is_nil(&self, index: AcceptableIndex) -> bool for lua_isnil -> bool;
 	
-		/// Return `true` if the value at the given index is not valid.
+		/// Returns `true` if the value at the given index is not valid.
 		pub fn is_none(&self, index: AcceptableIndex) -> bool for lua_isnone -> bool;
 	
-		/// Return `true` if the value at the given index is not valid or is
-		/// `nil`.
+		/// Returns `true` if the value at the given index is not valid or is `nil`.
 		pub fn is_none_or_nil(&self, index: AcceptableIndex) -> bool
 			for lua_isnoneornil -> bool;
-		/// Return `true` if the value at the given index is a number.
 	
+		/// Returns `true` if the value at the given index is a number.
 		pub fn is_number(&self, index: AcceptableIndex) -> bool for lua_isnumber -> c_int;
 	
-		/// Return `true` if the value at the given index is a string *or* a
-		/// number, which is always convertible to a string.
+		/// Returns `true` if the value at the given index is a string *or* a number,
+		/// which is always convertible to a string.
 		pub fn is_string(&self, index: AcceptableIndex) -> bool for lua_isstring -> c_int;
 	
-		/// Return `true` if the value at the given index is a table.
+		/// Returns `true` if the value at the given index is a table.
 		pub fn is_table(&self, index: AcceptableIndex) -> bool for lua_istable -> bool;
 	
-		/// Return `true` if the value at the given index is a thread.
+		/// Returns `true` if the value at the given index is a thread.
 		pub fn is_thread(&self, index: AcceptableIndex) -> bool for lua_isthread -> bool;
 	
-		/// Return `true` if the value at the given index is a userdata (either
-		/// full or light).
+		/// Returns `true` if the value at the given index is a userdata (either full or light).
 		pub fn is_userdata(&self, index: AcceptableIndex) -> bool
 			for lua_isuserdata -> c_int;
 	}
 
-	/// Return `true` if the coroutine can yield.
+	/// Returns `true` if the coroutine can yield.
 	pub fn can_yield(&self) -> bool {
 		(unsafe { lua_isyieldable(self.as_ptr_inspect()) }) != 0
 	}
 	
-	/// Pop a key from the stack, and push a key–value pair from the table at
+	/// Pops a key from the stack, and pushes a key–value pair from the table at
 	/// the given index, the "next" pair after the given key.
 	/// 
 	/// This function returns `true` while there are still elements to go
-	/// through. If there are no more elements in the table, then this it
+	/// through. If there are no more elements in the table, then it
 	/// returns `false` and pushes nothing.
 	/// 
 	/// # Note on string conversion functions
@@ -413,29 +416,29 @@ impl Thread {
 		(unsafe { lua_next(self.as_ptr_no_gc(), index) }) != 0
 	}
 
-	/// Push a [`bool`] onto the stack.
+	/// Pushes a [`bool`] onto the stack.
 	pub fn push_boolean(&self, value: bool) {
 		unsafe { lua_pushboolean(self.as_ptr_no_gc(), if value { 1 } else { 0 }) }
 	}
 
-	/// Push a light C function onto the stack (that is, a C function with no upvalues).
+	/// Pushes a light C function onto the stack (that is, a C function with no upvalues).
 	/// 
 	/// See also [`Managed::push_c_closure`].
 	pub fn push_c_function(&self, func: lua_CFunction) {
 		unsafe { lua_pushcfunction(self.as_ptr_no_gc(), func) }
 	}
 
-	/// Push the global environment onto the stack.
+	/// Pushes the global environment onto the stack.
 	pub fn push_global_table(&self) {
 		unsafe { lua_pushglobaltable(self.as_ptr_no_gc()) }
 	}
 
-	/// Push an [`Integer`] onto the stack.
+	/// Pushes an [`Integer`] onto the stack.
 	pub fn push_integer(&self, value: Integer) {
 		unsafe { lua_pushinteger(self.as_ptr_no_gc(), value) }
 	}
 
-	/// Push a light userdata onto the stack.
+	/// Pushes a light userdata onto the stack.
 	/// 
 	/// A light userdata represents a plain pointer.
 	/// It is a value, like a number:
@@ -451,29 +454,29 @@ impl Thread {
 		unsafe { lua_pushlightuserdata(self.as_ptr_no_gc(), ptr) }
 	}
 
-	/// Push `nil` onto the stack.
+	/// Pushes `nil` onto the stack.
 	pub fn push_nil(&self) {
 		unsafe { lua_pushnil(self.as_ptr_no_gc()) }
 	}
 
-	/// Push a [`Number`] onto the stack.
+	/// Pushes a [`Number`] onto the stack.
 	pub fn push_number(&self, value: Number) {
 		unsafe { lua_pushnumber(self.as_ptr_no_gc(), value) }
 	}
 
-	/// Push the Lua thread represented by this [`Thread`] onto its own stack,
+	/// Pushes the Lua thread represented by this [`Thread`] onto its own stack,
 	/// and return `true` if this thread is the main thread
 	/// (see also [`Lua`](crate::Lua)).
 	pub fn push_thread(&self) -> bool {
 		(unsafe { lua_pushthread(self.as_ptr_no_gc()) }) != 0
 	}
 
-	/// Push a copy of the element at the given index onto the stack.
+	/// Pushes a copy of the element at the given index onto the stack.
 	pub fn push_value(&self, index: AcceptableIndex) {
 		unsafe { lua_pushvalue(self.as_ptr_no_gc(), index) }
 	}
 
-	/// Return `true` if the two values in indices `idx_a` and `idx_b` are
+	/// Returns `true` if the two values in indices `idx_a` and `idx_b` are
 	/// primitively equal (that is, equal without calling the `__eq` metamethod).
 	/// 
 	/// This also returns `false` if any of the indices are not valid.
@@ -481,7 +484,7 @@ impl Thread {
 		(unsafe { lua_rawequal(self.as_ptr_no_gc(), idx_a, idx_b) }) != 0
 	}
 
-	/// Without calling metamethods, push `t[k]`, where `t` is the value at the
+	/// Without calling metamethods, pushes `t[k]`, where `t` is the value at the
 	/// given index and `k` is the value on the top of the stack.
 	/// 
 	/// # Safety
@@ -492,7 +495,7 @@ impl Thread {
 		) }
 	}
 
-	/// Without calling metamethods, push `t[i]`, where `t` is the value at the
+	/// Without calling metamethods, pushes `t[i]`, where `t` is the value at the
 	/// given index.
 	/// 
 	/// # Safety
@@ -503,7 +506,7 @@ impl Thread {
 		) }
 	}
 
-	/// Without calling metamethods, push `t[ptr]`, where `t` is the value at
+	/// Without calling metamethods, pushes `t[ptr]`, where `t` is the value at
 	/// the given index and `ptr` is the given pointer represented as a light
 	/// userdata.
 	/// 
@@ -515,7 +518,7 @@ impl Thread {
 		) }
 	}
 
-	/// Return the raw "length" of the value at the given index.
+	/// Returns the raw "length" of the value at the given index.
 	/// 
 	/// For strings, this is the string length;
 	/// for tables, this is the result of the length operator (`#`) with no
@@ -527,14 +530,14 @@ impl Thread {
 		unsafe { lua_rawlen(self.as_ptr_no_gc(), index) }
 	}
 
-	/// Move the top element into the given valid index without shifting any
+	/// Moves the top element into the given valid index without shifting any
 	/// element (therefore replacing the value at that given index),
 	/// and then pop that top element.
 	pub fn replace(&self, index: c_int) {
 		unsafe { lua_replace(self.as_ptr_no_gc(), index) }
 	}
 
-	/// Rotate the stack elements between the valid index `index` and the top of
+	/// Rotates the stack elements between the valid index `index` and the top of
 	/// the stack.
 	/// 
 	/// The elements are rotated `n` positions in the direction of the top for a 
@@ -549,7 +552,7 @@ impl Thread {
 		unsafe { lua_rotate(self.as_ptr_no_gc(), index, n_values) }
 	}
 
-	/// Pop a value from the stack and set it as the new `n`-th user value
+	/// Pops a value from the stack and sets it as the new `n`-th user value
 	/// associated to the full userdata at the given index.
 	/// 
 	/// Returns `false` if the userdata does not have that value.
@@ -557,14 +560,14 @@ impl Thread {
 		(unsafe { lua_setiuservalue(self.as_ptr_no_gc(), ud_index, n) }) != 0
 	}
 
-	/// Pop a table or `nil` from the stack and sets that value as the new
+	/// Pops a table or `nil` from the stack and sets that value as the new
 	/// metatable for the value at the given index. (`nil` means no metatable.)
 	// NOTE: `lua_setmetatable` always returns a `1`, which isn't useful.
 	pub fn set_metatable(&self, obj_index: c_int) {
 		unsafe { lua_setmetatable(self.as_ptr_no_gc(), obj_index) };
 	}
 
-	/// Set the warning function to be used by Lua to emit warnings
+	/// Sets the warning function to be used by Lua to emit warnings
 	/// (see [`lua_WarnFunction`]).
 	/// 
 	/// See also [`Thread::remove_warn_fn`].
@@ -576,14 +579,14 @@ impl Thread {
 		unsafe { lua_setwarnf(self.as_ptr_no_gc(), Some(warn), warn_data) }
 	}
 
-	/// Remove the warning function to be used by Lua to emit warnings.
+	/// Removes the warning function to be used by Lua to emit warnings.
 	/// 
 	/// See also [`Thread::set_warn_fn`].
 	pub fn remove_warn_fn(&self) {
 		unsafe { lua_setwarnf(self.as_ptr_no_gc(), None, null_mut()) }
 	}
 
-	/// Return the status of the Lua thread represented by this [`Thread`].
+	/// Returns the status of this Lua thread.
 	/// 
 	/// The status can be [`Status::Ok`] for a normal thread, an error variant
 	/// if the thread finished the execution of a [`Managed::resume`] with an
@@ -596,7 +599,7 @@ impl Thread {
 		unsafe { Status::from_c_int_unchecked(lua_status(self.as_ptr_inspect())) }
 	}
 
-	/// Convert the Lua value at the given index to a [`bool`].
+	/// Converts the Lua value at the given index to a [`bool`].
 	/// 
 	/// Like all tests in Lua, this returns `true` for any Lua value different
 	/// from `false` and `nil`; otherwise it returns `false`.
@@ -607,13 +610,13 @@ impl Thread {
 		(unsafe { lua_toboolean(self.as_ptr_no_gc(), idx) }) != 0
 	}
 
-	/// Convert a value at the given index to a C function.
+	/// Converts a value at the given index to a C function.
 	/// If it is not one, return `None`.
 	pub fn to_c_function(&self, index: c_int) -> Option<lua_CFunction> {
 		unsafe { lua_tocfunction(self.as_ptr_no_gc(), index) }
 	}
 
-	/// Mark the given index in the stack as a to-be-closed slot.
+	/// Marks the given index in the stack as a to-be-closed slot.
 	/// 
 	/// Like a to-be-closed variable in Lua, the value at that slot in the stack
 	/// will be closed when it goes out of scope.
@@ -647,7 +650,7 @@ impl Thread {
 		unsafe { lua_tointeger(self.as_ptr_no_gc(), idx) }
 	}
 
-	/// Convert the Lua value at the given index to the signed integral type
+	/// Converts the Lua value at the given index to the signed integral type
 	/// [`Integer`].
 	/// 
 	/// The Lua value must be an integer, or a number or string convertible to
@@ -664,7 +667,7 @@ impl Thread {
 		unsafe { lua_tonumber(self.as_ptr_no_gc(), idx) }
 	}
 
-	/// Convert the Lua value at the given index to the floating-point number
+	/// Converts the Lua value at the given index to the floating-point number
 	/// type [`Number`].
 	/// 
 	/// The Lua value must be a number or string convertible to a number.
@@ -675,7 +678,7 @@ impl Thread {
 		(is_num != 0).then_some(result)
 	}
 
-	/// Convert the value at the given index to a generic C pointer
+	/// Converts the value at the given index to a generic C pointer
 	/// ([`*const c_void`](c_void)).
 	/// 
 	/// The value can be a userdata, a table, a thread, a string, or a function;
@@ -689,37 +692,38 @@ impl Thread {
 		unsafe { lua_topointer(self.as_ptr_no_gc(), idx) }
 	}
 
-	/// Convert the value at the given index to a Lua thread, represented by a
-	/// `*mut`[`lua_State`].
+	/// Converts the value at the given index to a Lua thread,
+	/// represented by a `*mut`[`lua_State`].
 	/// 
 	/// The value must be a thread; otherwise, the function returns null.
 	pub fn to_thread(&self, index: c_int) -> *mut lua_State {
 		unsafe { lua_tothread(self.as_ptr_no_gc(), index) }
 	}
 
-	/// If the value at the given index is a light or full userdata, return the
-	/// address it represents. Otherwise, return null.
+	/// If the value at the given index is a light or full userdata,
+	/// returns the address it represents.
+	/// Otherwise, returns null.
 	pub fn to_userdata(&self, idx: c_int) -> *mut c_void {
 		unsafe { lua_touserdata(self.as_ptr_no_gc(), idx) }
 	}
 
-	/// Return the type of the value in the given valid index, or [`Type::None`]
+	/// Returns the type of the value in the given valid index, or [`Type::None`]
 	/// for a non-valid but acceptable index.
 	pub fn type_of(&self, idx: c_int) -> Type {
 		unsafe { Type::from_c_int_unchecked(lua_type(self.as_ptr_inspect(), idx)) }
 	}
 
-	/// Return the name of the type encoded by `type_tag`.
+	/// Returns the name of the type encoded by `type_tag`.
 	pub fn type_name(&self, type_tag: Type) -> &CStr {
 		unsafe { CStr::from_ptr(lua_typename(self.as_ptr_inspect(), type_tag as _)) }
 	}
 
-	/// Return the version number of the Lua core.
+	/// Returns the version number of the Lua core.
 	pub fn version(&self) -> Number {
 		unsafe { lua_version(self.as_ptr_inspect()) }
 	}
 
-	/// Emit a warning with the given message.
+	/// Emits a warning with the given message.
 	/// 
 	/// A message in a call with `to_be_continued == true` should be continued
 	/// in another call to this function.
@@ -729,7 +733,7 @@ impl Thread {
 		) }
 	}
 
-	/// Exchange values between different threads of the same state.
+	/// Exchanges values between different threads of the same state.
 	/// 
 	/// This function pops `n_values` values from the stack of this thread, and
 	/// pushes them onto the stack of the thread `to`.
@@ -759,7 +763,7 @@ impl Thread {
 		unsafe { lua_yield_in_hook(self.as_ptr_no_gc(), n_results) };
 	}
 
-	/// Yield this thread (like a coroutine).
+	/// Yields this thread (like a coroutine).
 	/// 
 	/// When this function is called, the running coroutine suspends its
 	/// execution, and the call to [`Managed::resume`] that started this
@@ -827,17 +831,17 @@ impl Thread {
 		) };
 	}
 
-	/// Return the current hook count.
+	/// Returns the current hook count.
 	pub fn hook_count(&self) -> c_int {
 		unsafe { lua_gethookcount(self.as_ptr_inspect()) }
 	}
 
-	/// Return the current hook [`EventMask`].
+	/// Returns the current hook [`EventMask`].
 	pub fn hook_mask(&self) -> EventMask {
 		unsafe { EventMask(lua_gethookmask(self.as_ptr_inspect())) }
 	}
 
-	/// Get information about the `n`-th upvalue of the closure at index
+	/// Gets information about the `n`-th upvalue of the closure at index
 	/// `func_index`.
 	/// 
 	/// This function pushes the upvalue's value onto the stack and returns its
@@ -847,7 +851,7 @@ impl Thread {
 		unsafe { crate::util::opt_c_str(lua_getupvalue(self.as_ptr_inspect(), func_index, n as _)) }
 	}
 
-	/// Set the value of a closure's upvalue and return its name.
+	/// Sets the value of a closure's upvalue and return its name.
 	/// 
 	/// Returns `None` (and pops nothing) when the index `n` is greater than the
 	/// number of upvalues. 
@@ -858,7 +862,7 @@ impl Thread {
 		unsafe { crate::util::opt_c_str(lua_setupvalue(self.as_ptr_inspect(), func_index, n as _)) }
 	}
 
-	/// Return a unique identifier for the upvalue numbered `n` from the closure
+	/// Returns a unique identifier for the upvalue numbered `n` from the closure
 	/// at index `func_index`.
 	/// 
 	/// These unique identifiers allow a program to check whether different
@@ -872,7 +876,7 @@ impl Thread {
 		unsafe { lua_upvalueid(self.as_ptr_inspect(), func_index, n as _) }
 	}
 
-	/// Make the
+	/// Makes the
 	/// `n_into`-th upvalue of the Lua closure at index `func_into_index`
 	/// refer to the
 	/// `n_from`-th upvalue of the Lua closure at index `func_from_index`.

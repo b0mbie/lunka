@@ -17,14 +17,14 @@ fn main() {
 			// `uh_oh` will always raise a Lua error, which will always diverge.
 			// However, it is impossible for the compiler to know about this;
 			// `guard` may be dropped on some platforms, but that may not be the case on others!
-			unsafe {
+			{
 				lua.push_function(uh_oh);
 				lua.managed().call(0, 0);
 			}
 
 			drop(guard);
 		}));
-		unsafe { lua.managed().call(0, 0) }
+		lua.managed().call(0, 0)
 	}).unwrap_err();
 }
 

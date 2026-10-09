@@ -43,15 +43,15 @@ extern "C-unwind" fn l_metadata(mut lua: LuaCtx<'_>) -> LuaRets {
 	} else {
 		"other"
 	}.as_bytes());
-	unsafe { mg.set_field(-2, c"type") };
+	mg.set_field(-2, c"type");
 
 	mg.push_integer(meta.len() as _);
-	unsafe { mg.set_field(-2, c"len") };
+	mg.set_field(-2, c"len");
 
 	if let Ok(time) = meta.modified()
 	&& let Ok(time) = time.duration_since(SystemTime::UNIX_EPOCH) {
 		mg.push_number(time.as_secs_f64());
-		unsafe { mg.set_field(-2, c"modified") };
+		mg.set_field(-2, c"modified");
 	}
 
 	1.into()

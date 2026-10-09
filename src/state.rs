@@ -3,6 +3,7 @@ use core::{
 	ops::{
 		Deref, DerefMut,
 	},
+	ptr::NonNull,
 };
 
 use crate::{
@@ -81,38 +82,35 @@ use crate::cdef::auxlib::*;
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Lua {
-	thread: &'static mut Thread,
+	thread: NonNull<Thread>,
 }
 
 impl Drop for Lua {
 	fn drop(&mut self) {
-		unsafe { self.thread.close_as_main() }
+		unsafe { self.as_mut_thread().close_as_main() }
 	}
 }
 
 impl AsRef<Thread> for Lua {
 	fn as_ref(&self) -> &Thread {
-		self.thread
+		self.as_thread()
 	}
 }
-
 impl AsMut<Thread> for Lua {
 	fn as_mut(&mut self) -> &mut Thread {
-		self.thread
+		self.as_mut_thread()
 	}
 }
 
 impl Deref for Lua {
 	type Target = Thread;
-
 	fn deref(&self) -> &Self::Target {
-		self.thread
+		self.as_thread()
 	}
 }
-
 impl DerefMut for Lua {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.thread
+		self.as_mut_thread()
 	}
 }
 
@@ -126,21 +124,32 @@ impl Lua {
 	/// You may not, for example, pass a coroutine pointer to this, as the
 	/// coroutine will not be owned by Rust code.
 	pub unsafe fn from_ptr(l: *mut lua_State) -> Self {
-		let thread = unsafe { Thread::from_ptr_mut(l) };
-		Self {
-			thread
+		unsafe {
+			Self {
+				thread: NonNull::new_unchecked(l).cast(),
+			}
 		}
 	}
 
 	unsafe fn from_new_ptr(l: *mut lua_State) -> Option<Self> {
 		if !l.is_null() {
-			let lua = Self {
-				thread: unsafe { Thread::from_ptr_mut(l) }
-			};
-			Some(lua)
+			unsafe { Some(Self::from_ptr(l)) }
 		} else {
 			None
 		}
+	}
+
+	pub const fn as_thread(&self) -> &Thread {
+		unsafe { self.thread.as_ref() }
+	}
+
+	pub const fn as_mut_thread(&mut self) -> &mut Thread {
+		unsafe { self.thread.as_mut() }
+	}
+
+	/// Return the raw pointer to the underlying Lua state.
+	pub fn as_ptr(&mut self) -> *mut lua_State {
+		self.thread.as_ptr() as _
 	}
 
 	/// Construct a new [`Lua`] using the `lauxlib` function [`luaL_newstate`].
@@ -269,10 +278,5 @@ impl Lua {
 		}
 
 		unsafe { Self::from_new_ptr(lua_newstate(l_alloc, null_mut())) }
-	}
-
-	/// Return the raw pointer to the underlying Lua state.
-	pub fn as_ptr(&mut self) -> *mut lua_State {
-		self.thread.as_ptr()
 	}
 }

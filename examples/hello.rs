@@ -5,7 +5,7 @@ fn main() {
 
 	let mut mg = lua.managed();
 	mg.push_function(l_main);
-	let did_run_ok = if unsafe { mg.pcall(0, 1, 0).is_ok() } {
+	let did_run_ok = if mg.pcall(0, 1, 0).is_ok() {
 		mg.to_boolean(-1)
 	} else {
 		false
@@ -34,7 +34,7 @@ extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 		return 1.into()
 	}
 
-	let is_ok = unsafe { lua.managed().pcall(0, 0, 0).is_ok() };
+	let is_ok = lua.managed().pcall(0, 0, 0).is_ok();
 	if !is_ok {
 		let mut lua = lua.managed();
 		let error = {
