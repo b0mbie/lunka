@@ -17,7 +17,7 @@ fn main() -> ExitCode {
 	let mut lua = Lua::new();
 
 	lua.push_function(l_main);
-	let status = lua.managed().pcall(0, 1, 0);
+	let status = lua.pcall(0, 1, 0);
 	let is_ok = lua.to_boolean(-1);
 	report(&mut lua, status);
 
@@ -30,19 +30,19 @@ fn main() -> ExitCode {
 
 extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 	lua.check_version();
-	lua.managed().open_libs();
+	lua.open_libs();
 
 	lua.push_function(l_err_handler);
 	let base = lua.top();
 
 	let mut arguments = args().skip(1);
 	let load_status = if let Some(mut file_name) = arguments.next() {
-		lua.managed().load_file(unsafe {
+		lua.load_file(unsafe {
 			file_name.push('\0');
 			CStr::from_bytes_until_nul(file_name.as_bytes()).unwrap_unchecked()
 		})
 	} else {
-		lua.managed().load_stdin()
+		lua.load_stdin()
 	};
 
 	if !report(&mut lua, load_status) {
@@ -51,14 +51,13 @@ extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 
 	let mut arg_count: c_uint = 0;
 	for arg in arguments {
-		lua.managed().push_string(arg.as_bytes());
+		lua.push_string(arg.as_bytes());
 		arg_count += 1;
 	}
 
-	let mut mg = lua.managed();
-	mg.restart_gc();
-	let run_status = mg.pcall(arg_count, 0, base);
-	mg.stop_gc();
+	lua.restart_gc();
+	let run_status = lua.pcall(arg_count, 0, base);
+	lua.stop_gc();
 	if !report(&mut lua, run_status) {
 		return 0.into()
 	}
@@ -69,13 +68,13 @@ extern "C-unwind" fn l_main(mut lua: LuaCtx<'_>) -> LuaRets {
 
 extern "C-unwind" fn l_err_handler(mut lua: LuaCtx<'_>) -> LuaRets {
 	unsafe {
-		if let Some(msg) = lua.managed_no_gc().to_c_str(1) {
-			lua.managed_no_gc().traceback_self(Some(msg), 1);
+		if let Some(msg) = lua.no_gc().to_c_str(1) {
+			lua.no_gc().traceback_self(Some(msg), 1);
 			return 1.into()
 		}
 	}
 
-	let ok = lua.managed().call_metamethod(1, c"__tostring");
+	let ok = lua.call_metamethod(1, c"__tostring");
 	if ok && lua.type_of(-1) == LuaType::String {
 		return 1.into()
 	}
@@ -87,10 +86,10 @@ extern "C-unwind" fn l_err_handler(mut lua: LuaCtx<'_>) -> LuaRets {
 
 fn report(lua: &mut LuaThread, status: LuaStatus) -> bool {
 	if !status.is_ok() {
-		if let Some(message) = lua.managed().to_c_str(-1) {
+		if let Some(message) = lua.to_c_str(-1) {
 			c_eprintln(message);
 		}
-		lua.managed().pop(1);
+		lua.pop(1);
 		false
 	} else {
 		true

@@ -19,12 +19,12 @@ fn main() {
 			// `guard` may be dropped on some platforms, but that may not be the case on others!
 			{
 				lua.push_function(uh_oh);
-				lua.managed().call(0, 0);
+				lua.call(0, 0);
 			}
 
 			drop(guard);
 		}));
-		lua.managed().call(0, 0)
+		lua.call(0, 0)
 	}).unwrap_err();
 }
 

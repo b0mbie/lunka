@@ -2,7 +2,6 @@
 
 use crate::{
 	cdef::*,
-	managed::*,
 	util::lunka_attrs,
 	GcMode,
 	AbsIndex, ValidIndex, AcceptableIndex,
@@ -13,9 +12,68 @@ use core::{
 	ffi::{
 		c_int, c_uint, c_void, CStr,
 	},
-	marker::PhantomData,
 	ptr::null_mut,
 };
+
+#[cfg(not(feature = "unsafe-assume-api-checks"))]
+macro_rules! checked_api_body {
+	{
+		$Result:tt
+		{$($checked_t:tt)*}
+		{$($unchecked_t:tt)*}
+	} => {
+		$($checked_t)*
+	};
+}
+#[cfg(feature = "unsafe-assume-api-checks")]
+macro_rules! checked_api_body {
+	{
+		$Result:tt
+		{$($checked_t:tt)*}
+		{$($unchecked_t:tt)*}
+	} => {
+		// Parse and type-check the "checked" function body even if it is not used.
+		if false {
+			let _: $Result = {$($checked_t)*};
+		}
+		$($unchecked_t)*
+	};
+}
+
+/// Define a pair of "checked" and "unchecked" API methods.
+/// 
+/// "Checked" functions ***must*** [`panic!`] on an unfulfilled safety condition -
+/// they must not fail silently, nor raise a Lua error!
+macro_rules! checked_api {
+	{
+		$(#[$attr:meta])*
+		fn $checked:ident($($p:tt)*) $(-> $Result:ty)? {$($checked_t:tt)*}
+		$(#[$unchecked_attr:meta])*
+		unsafe fn $unchecked:ident {$($unchecked_t:tt)*}
+	} => {
+		$(#[$attr])*
+		pub fn $checked($($p)*) $(-> $Result)? {
+			checked_api_body! {
+				($($Result)?)
+				{$($checked_t)*}
+				{$($unchecked_t)*}
+			}
+		}
+
+		$(#[$attr])*
+		$(#[$unchecked_attr])*
+		pub unsafe fn $unchecked($($p)*) $(-> $Result)? {$($unchecked_t)*}
+	};
+}
+impl Thread {
+	fn is_invalid_index(&self, index: AcceptableIndex) -> bool {
+		index.is_negative() && self.top().wrapping_add(index).is_negative()
+	}
+}
+
+/// Type for user value indices.
+// N.B. This is based on the `Udata` definition in `lobject.h`.
+pub type UserValueIdx = core::ffi::c_ushort;
 
 macro_rules! lua_is {
 	(
@@ -50,7 +108,7 @@ macro_rules! lua_is {
 		)*
 	) => {
 		$(
-			lua_is!{
+			lua_is! {
 				@ $ffi_fn_ret
 				$(#[$attr])*
 				$vis fn $name(&self, index: AcceptableIndex) -> bool
@@ -82,8 +140,6 @@ macro_rules! lua_is {
 /// that any references that have been acquired previously from a [`Thread`] are
 /// immediately invalidated, so they cannot be used *if* the garbage collector
 /// decides to collect them.
-/// This is done by borrowing [`Thread`] mutably once, through
-/// [`Thread::managed`], which allows for more operations.
 /// 
 /// The main reason for this model existing is because it may be difficult to
 /// formally prove that a reference would not be collected without using stack
@@ -105,7 +161,7 @@ impl Thread {
 	/// # Safety
 	/// `l` must point to a valid Lua state (`lua_State *` in C), for the
 	/// duration specified by `'a`.
-	pub unsafe fn from_ptr<'a>(l: *mut lua_State) -> &'a Self {
+	pub const unsafe fn from_ptr<'a>(l: *mut lua_State) -> &'a Self {
 		unsafe { &*(l as *mut Self) }
 	}
 
@@ -120,7 +176,7 @@ impl Thread {
 	/// This means that you must guarantee that there
 	/// may not be two `&mut Thread`s that point to the same state,
 	/// nor a `&Thread` and a `&mut Thread`.
-	pub unsafe fn from_ptr_mut<'a>(l: *mut lua_State) -> &'a mut Self {
+	pub const unsafe fn from_ptr_mut<'a>(l: *mut lua_State) -> &'a mut Self {
 		unsafe { &mut *(l as *mut Self) }
 	}
 
@@ -133,7 +189,7 @@ impl Thread {
 	/// 
 	/// # Safety
 	/// The returned pointer must only be used for *inspecting* the state.
-	pub unsafe fn as_ptr_inspect(&self) -> *mut lua_State {
+	pub const unsafe fn as_ptr_inspect(&self) -> *mut lua_State {
 		self.raw.get()
 	}
 
@@ -144,35 +200,13 @@ impl Thread {
 	/// The following situations are considered to be OK:
 	/// - Pushing a value on the stack (the GC is not run).
 	/// - Causing a error.
-	pub unsafe fn as_ptr_no_gc(&self) -> *mut lua_State {
+	pub const unsafe fn as_ptr_no_gc(&self) -> *mut lua_State {
 		self.raw.get()
 	}
 
-	/// Returns a context that allows to run code
-	/// that can restart the GC and potentially invalidate pointers.
-	pub fn managed(&mut self) -> Managed<'_> {
-		Managed {
-			l: self.as_ptr(),
-			_life: PhantomData
-		}
-	}
-
-	/// This is the same as [`Thread::managed`], however it doesn't borrow
-	/// mutably by assuming that the garbage collector will not collect (and
-	/// thus invalidate) any outside references.
-	/// 
-	/// # Safety
-	/// The returned context must not be used for any operations
-	/// which may cause the garbage collector to invalidate pointers.
-	/// 
-	/// For example, if performing arithmetic does not trigger any metamethods,
-	/// or if returned pointers are still on the Lua stack,
-	/// then this guarantee is not broken.
-	pub unsafe fn managed_no_gc(&self) -> Managed<'_> {
-		Managed {
-			l: unsafe { self.as_ptr_no_gc() },
-			_life: PhantomData
-		}
+	#[allow(clippy::mut_from_ref)]
+	pub const unsafe fn no_gc(&self) -> &mut Self {
+		unsafe { Thread::from_ptr_mut(self.as_ptr_no_gc()) }
 	}
 
 	/// Closes all active to-be-closed variables in the main thread, release all
@@ -313,9 +347,9 @@ impl Thread {
 	/// userdata at the given index and returns the type of the pushed value.
 	/// 
 	/// If the userdata does not have that value, push `nil` and return [`Type::None`]. 
-	pub fn get_i_uservalue(&self, ud_index: c_int, n: c_int) -> Type {
+	pub fn get_i_uservalue(&self, ud_index: c_int, n: UserValueIdx) -> Type {
 		unsafe { Type::from_c_int_unchecked(
-			lua_getiuservalue(self.as_ptr_no_gc(), ud_index, n)
+			lua_getiuservalue(self.as_ptr_no_gc(), ud_index, n as _)
 		) }
 	}
 
@@ -404,9 +438,9 @@ impl Thread {
 	/// returns `false` and pushes nothing.
 	/// 
 	/// # Note on string conversion functions
-	/// While traversing a table, avoid calling [`Managed::to_c_chars`] directly
+	/// While traversing a table, avoid calling [`Thread::to_c_chars`] directly
 	/// on a key, unless it is known that the key is actually a **string**.
-	/// [`Managed::to_c_chars`] and other similar functions may change the value
+	/// [`Thread::to_c_chars`] and other similar functions may change the value
 	/// at the given index; this confuses the next call to [`Thread::next`].
 	/// 
 	/// # Errors
@@ -423,7 +457,7 @@ impl Thread {
 
 	/// Pushes a light C function onto the stack (that is, a C function with no upvalues).
 	/// 
-	/// See also [`Managed::push_c_closure`].
+	/// See also [`Thread::push_c_closure`].
 	pub fn push_c_function(&self, func: lua_CFunction) {
 		unsafe { lua_pushcfunction(self.as_ptr_no_gc(), func) }
 	}
@@ -471,9 +505,20 @@ impl Thread {
 		(unsafe { lua_pushthread(self.as_ptr_no_gc()) }) != 0
 	}
 
-	/// Pushes a copy of the element at the given index onto the stack.
-	pub fn push_value(&self, index: AcceptableIndex) {
-		unsafe { lua_pushvalue(self.as_ptr_no_gc(), index) }
+	checked_api! {
+		/// Pushes a copy of the element at the given index onto the stack.
+		fn push_value(&self, index: AcceptableIndex) {
+			if self.is_invalid_index(index) {
+				panic!("invalid index")
+			} else {
+				unsafe { self.push_value_unchecked(index) }
+			}
+		}
+		/// # Safety
+		/// `index`, if negative, must not point to a value out of the stack's bounds.
+		unsafe fn push_value_unchecked {
+			unsafe { lua_pushvalue(self.as_ptr_no_gc(), index) }
+		}
 	}
 
 	/// Returns `true` if the two values in indices `idx_a` and `idx_b` are
@@ -533,31 +578,45 @@ impl Thread {
 	/// Moves the top element into the given valid index without shifting any
 	/// element (therefore replacing the value at that given index),
 	/// and then pop that top element.
-	pub fn replace(&self, index: c_int) {
-		unsafe { lua_replace(self.as_ptr_no_gc(), index) }
+	pub fn replace(&self, index: ValidIndex) {
+		unsafe { lua_replace(self.as_ptr_no_gc(), index.get()) }
 	}
 
-	/// Rotates the stack elements between the valid index `index` and the top of
-	/// the stack.
-	/// 
-	/// The elements are rotated `n` positions in the direction of the top for a 
-	/// ositive `n`, or `-n` positions in the direction of the bottom for a
-	/// negative `n`.
-	/// The absolute value of `n` must not be greater than the size of the slice
-	/// being rotated.
-	/// 
-	/// This function cannot be called with a pseudo-index, because a
-	/// pseudo-index is not an actual stack position.
-	pub fn rotate(&self, index: c_int, n_values: c_int) {
-		unsafe { lua_rotate(self.as_ptr_no_gc(), index, n_values) }
+	checked_api! {
+		/// Rotates the stack elements between
+		/// the valid index `index` and the top of the stack.
+		/// 
+		/// The elements are rotated `n` positions
+		/// in the direction of the top for a positive `n`,
+		/// or `-n` positions in the direction of the bottom for a negative `n`.
+		fn rotate(&self, index: ValidIndex, n: c_int) {
+			if n != 0 {
+				let top = self.top();
+				let from = if index.is_negative() {
+					top.wrapping_add(index.get())
+				} else {
+					index.get()
+				};
+				if n.abs() > top.wrapping_sub(from).wrapping_add(1) {
+					panic!("invalid 'n'")
+				}
+				unsafe { self.rotate_unchecked(index, n) }
+			}
+		}
+		/// # Safety
+		/// The absolute value of `n` must not
+		/// be greater than the size of the slice being rotated.
+		unsafe fn rotate_unchecked {
+			unsafe { lua_rotate(self.as_ptr_no_gc(), index.get(), n) }
+		}
 	}
 
 	/// Pops a value from the stack and sets it as the new `n`-th user value
 	/// associated to the full userdata at the given index.
 	/// 
 	/// Returns `false` if the userdata does not have that value.
-	pub fn set_i_uservalue(&self, ud_index: c_int, n: c_int) -> bool {
-		(unsafe { lua_setiuservalue(self.as_ptr_no_gc(), ud_index, n) }) != 0
+	pub fn set_i_uservalue(&self, ud_index: c_int, n: UserValueIdx) -> bool {
+		(unsafe { lua_setiuservalue(self.as_ptr_no_gc(), ud_index, n as _) }) != 0
 	}
 
 	/// Pops a table or `nil` from the stack and sets that value as the new
@@ -575,13 +634,13 @@ impl Thread {
 	/// # Safety
 	/// `warn_data` is the custom data to be passed to the warning function.
 	/// It must be valid for `warn`.
-	pub unsafe fn set_warn_fn(&self, warn: lua_WarnFunction, warn_data: *mut c_void) {
+	pub unsafe fn set_c_warn_fn(&self, warn: lua_WarnFunction, warn_data: *mut c_void) {
 		unsafe { lua_setwarnf(self.as_ptr_no_gc(), Some(warn), warn_data) }
 	}
 
 	/// Removes the warning function to be used by Lua to emit warnings.
 	/// 
-	/// See also [`Thread::set_warn_fn`].
+	/// See also [`Thread::set_c_warn_fn`].
 	pub fn remove_warn_fn(&self) {
 		unsafe { lua_setwarnf(self.as_ptr_no_gc(), None, null_mut()) }
 	}
@@ -589,7 +648,7 @@ impl Thread {
 	/// Returns the status of this Lua thread.
 	/// 
 	/// The status can be [`Status::Ok`] for a normal thread, an error variant
-	/// if the thread finished the execution of a [`Managed::resume`] with an
+	/// if the thread finished the execution of a [`Thread::resume`] with an
 	/// error, or [`Status::Yielded`] if the thread is suspended.
 	/// 
 	/// Functions can only be called in threads with status [`Status::Ok`].
@@ -622,12 +681,12 @@ impl Thread {
 	/// will be closed when it goes out of scope.
 	/// Here, in the context of a C function, to go out of scope means that the
 	/// running function returns to Lua, or there is an error, or the slot is
-	/// removed from the stack through [`Managed::set_top`] or [`Managed::pop`],
-	/// or there is a call to [`Managed::close_slot`].
+	/// removed from the stack through [`Thread::set_top`] or [`Thread::pop`],
+	/// or there is a call to [`Thread::close_slot`].
 	/// 
 	/// A slot marked as to-be-closed should not be removed from the stack by
-	/// any other function in the API except [`Managed::set_top`] or
-	/// [`Managed::pop`], unless previously deactivated by [`Managed::close_slot`].
+	/// any other function in the API except [`Thread::set_top`] or
+	/// [`Thread::pop`], unless previously deactivated by [`Thread::close_slot`].
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -644,9 +703,9 @@ impl Thread {
 		unsafe { lua_toclose(self.as_ptr_no_gc(), index) }
 	}
 
-	/// This behaves exactly the same as [`Thread::to_integer_opt`], however the
+	/// This behaves exactly the same as [`Thread::to_integer`], however the
 	/// return value is `0` if an integer isn't present.
-	pub fn to_integer(&self, idx: c_int) -> Integer {
+	pub fn to_integer_or_zero(&self, idx: c_int) -> Integer {
 		unsafe { lua_tointeger(self.as_ptr_no_gc(), idx) }
 	}
 
@@ -655,15 +714,15 @@ impl Thread {
 	/// 
 	/// The Lua value must be an integer, or a number or string convertible to
 	/// an integer. Otherwise, this function returns `None`.
-	pub fn to_integer_opt(&self, idx: c_int) -> Option<Integer> {
+	pub fn to_integer(&self, idx: c_int) -> Option<Integer> {
 		let mut is_num = 0;
 		let result = unsafe { lua_tointegerx(self.as_ptr_no_gc(), idx, &mut is_num as *mut _) };
 		(is_num != 0).then_some(result)
 	}
 
-	/// This behaves exactly the same as [`Thread::to_number_opt`], however the
+	/// This behaves exactly the same as [`Thread::to_number`], however the
 	/// return value is `0.0` if a number isn't present.
-	pub fn to_number(&self, idx: c_int) -> Number {
+	pub fn to_number_or_zero(&self, idx: c_int) -> Number {
 		unsafe { lua_tonumber(self.as_ptr_no_gc(), idx) }
 	}
 
@@ -672,7 +731,7 @@ impl Thread {
 	/// 
 	/// The Lua value must be a number or string convertible to a number.
 	/// Otherwise, this function returns `None`.
-	pub fn to_number_opt(&self, idx: c_int) -> Option<Number> {
+	pub fn to_number(&self, idx: c_int) -> Option<Number> {
 		let mut is_num = 0;
 		let result = unsafe { lua_tonumberx(self.as_ptr_no_gc(), idx, &mut is_num as *mut _) };
 		(is_num != 0).then_some(result)
@@ -766,18 +825,18 @@ impl Thread {
 	/// Yields this thread (like a coroutine).
 	/// 
 	/// When this function is called, the running coroutine suspends its
-	/// execution, and the call to [`Managed::resume`] that started this
+	/// execution, and the call to [`Thread::resume`] that started this
 	/// coroutine returns.
 	/// 
 	/// The parameter `n_results` is the number of values from the stack that
-	/// will be passed as results to [`Managed::resume`].
+	/// will be passed as results to [`Thread::resume`].
 	/// 
 	/// When the coroutine is resumed again, Lua calls the given continuation
 	/// function `continuation` to continue the execution of the C function that
 	/// yielded.
 	/// This continuation function receives the same stack from the previous
 	/// function, with the `n_results` results removed and replaced by the
-	/// arguments passed to [`Managed::resume`].
+	/// arguments passed to [`Thread::resume`].
 	/// Moreover, the continuation function receives the value `context` that
 	/// was originally passed.
 	/// 
@@ -851,7 +910,7 @@ impl Thread {
 		unsafe { crate::util::opt_c_str(lua_getupvalue(self.as_ptr_inspect(), func_index, n as _)) }
 	}
 
-	/// Sets the value of a closure's upvalue and return its name.
+	/// Sets the value of a closure's upvalue and returns its name.
 	/// 
 	/// Returns `None` (and pops nothing) when the index `n` is greater than the
 	/// number of upvalues. 

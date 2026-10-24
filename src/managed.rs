@@ -2,7 +2,9 @@
 
 use core::{
 	ffi::c_void,
-	ptr::null,
+	ptr::{
+		NonNull, null,
+	},
 };
 
 use crate::{
@@ -10,6 +12,7 @@ use crate::{
 	util::lunka_attrs,
 	Thread,
 	Coroutine,
+	UserValueIdx,
 	AbsIndex, ValidIndex, AcceptableIndex,
 };
 
@@ -20,50 +23,11 @@ use core::{
 	ffi::{
 		c_char, c_int, c_uint, CStr
 	},
-	marker::PhantomData,
-	ops::{
-		Deref, DerefMut
-	},
 	ptr::null_mut,
 	slice::from_raw_parts,
 };
 
-/// Context for invalidating pointers that may be freed during garbage collection.
-/// 
-/// This structure is returned by [`Thread::managed`] and [`Thread::managed_no_gc`].
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Managed<'l> {
-    pub(crate) l: *mut lua_State,
-    pub(crate) _life: PhantomData<&'l mut Thread>
-}
-
-impl AsRef<Thread> for Managed<'_> {
-	fn as_ref(&self) -> &Thread {
-		unsafe { Thread::from_ptr(self.l) }
-	}
-}
-
-impl AsMut<Thread> for Managed<'_> {
-	fn as_mut(&mut self) -> &mut Thread {
-		unsafe { Thread::from_ptr_mut(self.l) }
-	}
-}
-
-impl Deref for Managed<'_> {
-	type Target = Thread;
-	fn deref(&self) -> &Self::Target {
-		unsafe { Thread::from_ptr(self.l) }
-	}
-}
-
-impl DerefMut for Managed<'_> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		unsafe { Thread::from_ptr_mut(self.l) }
-	}
-}
-
-impl Managed<'_> {
+impl Thread {
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
 		/// Performs an arithmetic or bitwise operation over
@@ -80,7 +44,7 @@ impl Managed<'_> {
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 		/// from a metamethod.
 		pub fn arith(&mut self, operation: Arith) {
-			unsafe { lua_arith(self.l, operation as _) }
+			unsafe { lua_arith(self.as_ptr(), operation as _) }
 		}
 	}
 
@@ -93,7 +57,7 @@ impl Managed<'_> {
 		/// To do a call, you must use the following protocol:
 		/// - First, the function to be called is pushed onto the stack.
 		/// - Then, the arguments to the call are pushed in direct order; that is, the first argument is pushed first.
-		/// - Finally, call [`Managed::call`]; `n_args` is the number of arguments that were pushed onto the stack.
+		/// - Finally, call [`Thread::call`]; `n_args` is the number of arguments that were pushed onto the stack.
 		/// 
 		/// When the function returns, all arguments and the function value are
 		/// popped and the call results are pushed onto the stack.
@@ -108,13 +72,13 @@ impl Managed<'_> {
 		/// # Errors
 		/// Any [error](crate::errors) while calling and running the function is propagated upwards.
 		pub fn call(&mut self, n_args: c_uint, n_results: c_int) {
-			unsafe { lua_call(self.l, n_args as _, n_results) }
+			unsafe { lua_call(self.as_ptr(), n_args as _, n_results) }
 		}
 	}
 
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
-		/// Behaves exactly like [`Managed::call`],
+		/// Behaves exactly like [`Thread::call`],
 		/// but allows the called function to yield.
 		/// 
 		/// If the callee yields, then, once the thread is resumed, the continuation
@@ -129,7 +93,7 @@ impl Managed<'_> {
 			continuation: lua_KFunction, context: lua_KContext,
 		) {
 			unsafe { lua_callk(
-				self.l,
+				self.as_ptr(),
 				n_args as _, n_results,
 				context, Some(continuation)
 			) }
@@ -150,7 +114,7 @@ impl Managed<'_> {
 		/// The index must be the last index previously marked to be closed
 		/// that is still active (that is, not closed yet).
 		pub unsafe fn close_slot(&mut self, index: c_int) {
-			unsafe { lua_closeslot(self.l, index) }
+			unsafe { lua_closeslot(self.as_ptr(), index) }
 		}
 	}
 
@@ -172,7 +136,7 @@ impl Managed<'_> {
 			operation: Compare,
 			idx_a: c_int, idx_b: c_int
 		) -> bool {
-			(unsafe { lua_compare(self.l, idx_a, idx_b, operation as _) }) != 0
+			(unsafe { lua_compare(self.as_ptr(), idx_a, idx_b, operation as _) }) != 0
 		}
 	}
 
@@ -192,7 +156,7 @@ impl Managed<'_> {
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors)
 		/// from a metamethod.
 		pub fn concat(&mut self, n: c_uint) {
-			unsafe { lua_concat(self.l, n as _) }
+			unsafe { lua_concat(self.as_ptr(), n as _) }
 		}
 	}
 
@@ -206,7 +170,7 @@ impl Managed<'_> {
 		/// This preallocation may help performance when its known in advance how
 		/// many elements the table will have.
 		/// 
-		/// See also [`Managed::new_table`].
+		/// See also [`Thread::new_table`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -216,7 +180,7 @@ impl Managed<'_> {
 	}
 
 	lunka_attrs! {
-		[]
+		[may_raise(arbitrary), runs_code]
 		/// Dumps a function as a binary chunk,
 		/// and returns the status of the operation.
 		/// 
@@ -234,7 +198,10 @@ impl Managed<'_> {
 		/// The value returned is the error code returned by
 		/// the last call to the writer.
 		/// 
-		/// This function does not pop the Lua function from the stack. 
+		/// This function does not pop the Lua function from the stack.
+		/// 
+		/// # Errors
+		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		/// 
 		/// # Safety
 		/// `writer_data` must be valid to be passed to `writer`.
@@ -292,7 +259,10 @@ impl Managed<'_> {
 		/// value of the global environment stored at index [`REGISTRY_GLOBALS`] in
 		/// the registry.
 		/// When loading main chunks, this upvalue will be the `_ENV` variable.
-		/// Other upvalues are initialized with `nil`. 
+		/// Other upvalues are initialized with `nil`.
+		/// 
+		/// # Errors
+		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		/// 
 		/// # Safety
 		/// `reader_data` must be valid to be passed to `reader`.
@@ -312,12 +282,11 @@ impl Managed<'_> {
 		}
 	}
 
-
 	lunka_attrs! {
 		[may_raise(memory)]
 		/// Creates a new empty table and pushes it onto the stack.
 		/// 
-		/// See also [`Managed::create_table`].
+		/// See also [`Thread::create_table`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -373,9 +342,9 @@ impl Managed<'_> {
 		pub unsafe fn new_userdata_raw(
 			&mut self,
 			size: usize,
-			n_uservalues: c_int,
-		) -> *mut c_void {
-			unsafe { lua_newuserdatauv(self.as_ptr(), size, n_uservalues) }
+			n_uservalues: UserValueIdx,
+		) -> NonNull<c_void> {
+			unsafe { NonNull::new_unchecked(lua_newuserdatauv(self.as_ptr(), size, n_uservalues as _)) }
 		}
 	}
 
@@ -417,7 +386,7 @@ impl Managed<'_> {
 
 	lunka_attrs! {
 		[may_raise(memory)]
-		/// Works the same as [`Managed::push_string`], however it accepts
+		/// Works the same as [`Thread::push_string`], however it accepts
 		/// [`c_char`]s instead of [`u8`]s.
 		/// 
 		/// # Errors
@@ -441,7 +410,7 @@ impl Managed<'_> {
 		/// memory pointed to by `data` can be safely freed or reused immediately
 		/// after the function returns.
 		/// 
-		/// See also [`Managed::push_c_chars`].
+		/// See also [`Thread::push_c_chars`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -467,7 +436,7 @@ impl Managed<'_> {
 		/// memory pointed to by `data` can be freed or reused immediately after the
 		/// function returns.
 		/// 
-		/// See also [`Managed::push_c_chars`] and [`Managed::push_string`].
+		/// See also [`Thread::push_c_chars`] and [`Thread::push_string`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -536,7 +505,7 @@ impl Managed<'_> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-		pub fn remove(&mut self, index: AbsIndex) {
+		pub fn remove(&mut self, index: ValidIndex) {
 			unsafe { lua_remove(self.as_ptr(), index.get()) }
 		}
 	}
@@ -545,7 +514,7 @@ impl Managed<'_> {
 		[runs_code]
 		/// Performs a full garbage collection cycle.
 		pub fn run_gc(&mut self) {
-			unsafe { lua_gc(self.l, GcTask::Collect as _) };
+			unsafe { lua_gc(self.as_ptr(), GcTask::Collect as _) };
 		}
 	}
 
@@ -566,7 +535,7 @@ impl Managed<'_> {
 		/// Performs an incremental step of garbage collection, corresponding to the
 		/// allocation of `step_size` kilobytes. 
 		pub fn step_gc(&mut self, step_size: c_uint) {
-			unsafe { lua_gc(self.l, GcTask::Step as _, step_size) };
+			unsafe { lua_gc(self.as_ptr(), GcTask::Step as _, step_size) };
 		}
 	}
 
@@ -575,7 +544,7 @@ impl Managed<'_> {
 		/// Converts the Lua value at the given index to a slice of [`c_char`]s,
 		/// representing a Lua string.
 		/// 
-		/// This function works like [`Managed::to_string`].
+		/// This function works like [`Thread::to_string`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -595,7 +564,7 @@ impl Managed<'_> {
 		/// Converts the Lua value at the given index to a [`CStr`],
 		/// representing a Lua string.
 		/// 
-		/// This function works like [`Managed::to_string`].
+		/// This function works like [`Thread::to_string`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -621,7 +590,7 @@ impl Managed<'_> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
-		pub fn to_string(&mut self, index: c_int) -> Option<&[u8]> {
+		pub fn to_string(&mut self, index: AcceptableIndex) -> Option<&[u8]> {
 			let mut len = 0;
 			let str_ptr = unsafe { lua_tolstring(self.as_ptr(), index, &mut len as *mut _) };
 			if !str_ptr.is_null() {
@@ -643,7 +612,7 @@ impl Managed<'_> {
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn get_field(&mut self, obj_index: c_int, key: &CStr) -> Type {
 			unsafe { Type::from_c_int_unchecked(
-				lua_getfield(self.l, obj_index, key.as_ptr())
+				lua_getfield(self.as_ptr(), obj_index, key.as_ptr())
 			) }
 		}
 	}
@@ -658,7 +627,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn get_i(&mut self, obj_index: c_int, i: Integer) -> Type {
-			unsafe { Type::from_c_int_unchecked(lua_geti(self.l, obj_index, i)) }
+			unsafe { Type::from_c_int_unchecked(lua_geti(self.as_ptr(), obj_index, i)) }
 		}
 	}
 
@@ -676,7 +645,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn get_table(&mut self, obj_index: c_int) -> Type {
-			unsafe { Type::from_c_int_unchecked(lua_gettable(self.l, obj_index)) }
+			unsafe { Type::from_c_int_unchecked(lua_gettable(self.as_ptr(), obj_index)) }
 		}
 	}
 
@@ -690,7 +659,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn length_of(&mut self, index: c_int) {
-			unsafe { lua_len(self.l, index) }
+			unsafe { lua_len(self.as_ptr(), index) }
 		}
 	}
 
@@ -698,7 +667,7 @@ impl Managed<'_> {
 		[may_raise(arbitrary), runs_code]
 		/// Starts or resumes this thread (like a coroutine).
 		/// 
-		/// See also [`Managed::resume_from`].
+		/// See also [`Thread::resume_from`].
 		/// 
 		/// This function returns [`Status::Yielded`] if the coroutine yields,
 		/// [`Status::Ok`] if the coroutine finishes its execution without errors,
@@ -736,7 +705,7 @@ impl Managed<'_> {
 		[may_raise(arbitrary), runs_code]
 		/// Resumes this thread, also specifying the thread that is resuming this one.
 		/// 
-		/// See [`Managed::resume`] for more information.
+		/// See [`Thread::resume`] for more information.
 		pub fn resume_from(&mut self, from: &mut Self, n_args: c_uint) -> (Status, c_int) {
 			let mut n_res = 0;
 			let status = unsafe { lua_resume(
@@ -753,13 +722,13 @@ impl Managed<'_> {
 		/// Calls a function (or a callable object) in protected mode.
 		/// 
 		/// Both `n_args` and `n_results` have the same meaning as in
-		/// [`Managed::call`].
+		/// [`Thread::call`].
 		/// 
 		/// If there are no errors during the call, this function behaves exactly
-		/// like [`Managed::call`].
+		/// like [`Thread::call`].
 		/// However, if there is any error, the function catches it, pushes a single
 		/// value on the stack (the error object), and returns an error code.
-		/// Like [`Managed::call`], this function always removes the function and
+		/// Like [`Thread::call`], this function always removes the function and
 		/// its arguments from the stack.
 		/// 
 		/// If `err_func` is `0`, then the error object returned on the stack is
@@ -779,14 +748,14 @@ impl Managed<'_> {
 			err_func: c_int
 		) -> Status {
 			unsafe { Status::from_c_int_unchecked(
-				lua_pcall(self.l, n_args as _, n_results, err_func)
+				lua_pcall(self.as_ptr(), n_args as _, n_results, err_func)
 			) }
 		}
 	}
 
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
-		/// Behaves exactly like [`Managed::pcall`], but allows the called function
+		/// Behaves exactly like [`Thread::pcall`], but allows the called function
 		/// to yield.
 		/// 
 		/// If the callee yields, then, once the thread is resumed, the continuation
@@ -802,7 +771,7 @@ impl Managed<'_> {
 			continuation: lua_KFunction, context: lua_KContext
 		) -> Status {
 			unsafe { Status::from_c_int_unchecked(lua_pcallk(
-				self.l,
+				self.as_ptr(),
 				n_args as _, n_results,
 				err_func,
 				context, Some(continuation)
@@ -814,14 +783,14 @@ impl Managed<'_> {
 		[may_raise(arbitrary), runs_code]
 		/// Pops `n` elements from the stack.
 		/// 
-		/// Because this is implemented with [`Managed::set_top`], this function can
+		/// Because this is implemented with [`Thread::set_top`], this function can
 		/// also run arbitrary code when removing an index marked as to-be-closed
 		/// from the stack.
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn pop(&mut self, n: c_uint) {
-			unsafe { lua_pop(self.l, n as _) }
+			unsafe { lua_pop(self.as_ptr(), n as _) }
 		}
 	}
 
@@ -832,7 +801,7 @@ impl Managed<'_> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-		pub fn register(&mut self, name: &CStr, func: lua_CFunction) {
+		pub fn register_c(&mut self, name: &CStr, func: lua_CFunction) {
 			unsafe { lua_register(self.as_ptr(), name.as_ptr(), func) }
 		}
 	}
@@ -851,14 +820,14 @@ impl Managed<'_> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-		pub fn require(
+		pub fn require_raw(
 			&mut self,
 			module_name: &CStr,
 			open_fn: lua_CFunction,
 			into_global: bool
 		) {
 			unsafe { luaL_requiref(
-				self.l,
+				self.as_ptr(),
 				module_name.as_ptr(),
 				open_fn,
 				if into_global { 1 } else { 0 }
@@ -879,7 +848,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn set_field(&mut self, obj_index: c_int, key: &CStr) {
-			unsafe { lua_setfield(self.l, obj_index, key.as_ptr()) }
+			unsafe { lua_setfield(self.as_ptr(), obj_index, key.as_ptr()) }
 		}
 	}
 
@@ -897,7 +866,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn set_table(&mut self, obj_index: c_int) {
-			unsafe { lua_settable(self.l, obj_index) }
+			unsafe { lua_settable(self.as_ptr(), obj_index) }
 		}
 	}
 
@@ -914,7 +883,7 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn set_top(&mut self, top: c_int) {
-			unsafe { lua_settop(self.l, top) }
+			unsafe { lua_settop(self.as_ptr(), top) }
 		}
 	}
 
@@ -931,13 +900,13 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn set_i(&mut self, obj_index: c_int, i: Integer) {
-			unsafe { lua_seti(self.l, obj_index, i) }
+			unsafe { lua_seti(self.as_ptr(), obj_index, i) }
 		}
 	}
 }
 
 #[cfg(feature = "stdlibs")]
-impl Managed<'_> {
+impl Thread {
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
 		/// Open all standard Lua libraries into the associated Lua thread.
@@ -945,13 +914,13 @@ impl Managed<'_> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn open_libs(&mut self) {
-			unsafe { stdlibs::luaL_openlibs(self.l) }
+			unsafe { stdlibs::luaL_openlibs(self.as_ptr()) }
 		}
 	}
 }
 
 #[cfg(feature = "auxlib")]
-impl<'l> Managed<'l> {
+impl Thread {
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
 		/// Calls a metamethod `event` on the object at index `obj_index`.
@@ -969,7 +938,7 @@ impl<'l> Managed<'l> {
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn call_metamethod(&mut self, obj_index: c_int, event: &CStr) -> bool {
 			(unsafe { luaL_callmeta(
-				self.l,
+				self.as_ptr(),
 				obj_index, event.as_ptr()
 			) }) != 0
 		}
@@ -982,7 +951,7 @@ impl<'l> Managed<'l> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn do_file(&mut self, file_name: &CStr) -> bool {
-			unsafe { luaL_dofile(self.l, file_name.as_ptr()) }
+			unsafe { luaL_dofile(self.as_ptr(), file_name.as_ptr()) }
 		}
 	}
 
@@ -993,7 +962,7 @@ impl<'l> Managed<'l> {
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn do_string(&mut self, code: &CStr) -> bool {
-			unsafe { luaL_dostring(self.l, code.as_ptr()) }
+			unsafe { luaL_dostring(self.as_ptr(), code.as_ptr()) }
 		}
 	}
 
@@ -1009,7 +978,7 @@ impl<'l> Managed<'l> {
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
 		pub fn get_sub_table(&mut self, parent_index: c_int, table_name: &CStr) -> bool {
 			(unsafe { luaL_getsubtable(
-				self.l,
+				self.as_ptr(),
 				parent_index, table_name.as_ptr()
 			) }) != 0
 		}
@@ -1028,7 +997,7 @@ impl<'l> Managed<'l> {
 		/// 
 		/// It can also raise an error from a metamethod.
 		pub fn meta_length_of(&mut self, obj_index: c_int) -> Integer {
-			unsafe { luaL_len(self.l, obj_index) }
+			unsafe { luaL_len(self.as_ptr(), obj_index) }
 		}
 	}
 
@@ -1037,36 +1006,36 @@ impl<'l> Managed<'l> {
 		/// Convert any Lua value at the given index to a string in a reasonable
 		/// format, and push that string onto the stack.
 		/// 
-		/// This function works the same way as [`Managed::to_string_meta`].
+		/// This function works the same way as [`Thread::to_string_meta`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-		pub fn to_c_chars_meta(&mut self, index: c_int) -> &'l [c_char] {
+		pub fn to_c_chars_meta(&mut self, index: c_int) -> &[c_char] {
 			let mut len = 0;
-			let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
+			let str_ptr = unsafe { luaL_tolstring(self.as_ptr(), index, &mut len as *mut _) };
 			unsafe { from_raw_parts(str_ptr, len) }
 		}
 	}
 
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
-		/// Convert any Lua value at the given index to a string in a reasonable
-		/// format, and push that string onto the stack.
+		/// Converts any Lua value at the given index to a string in a reasonable
+		/// format, and pushes that string onto the stack.
 		/// 
-		/// This function works the same way as [`Managed::to_string_meta`].
+		/// This function works the same way as [`Thread::to_string_meta`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
-		pub fn to_c_str_meta(&mut self, index: c_int) -> &'l CStr {
-			let str_ptr = unsafe { luaL_tolstring(self.l, index, null_mut()) };
+		pub fn to_c_str_meta(&mut self, index: c_int) -> &CStr {
+			let str_ptr = unsafe { luaL_tolstring(self.as_ptr(), index, null_mut()) };
 			unsafe { CStr::from_ptr(str_ptr) }
 		}
 	}
 
 	lunka_attrs! {
 		[may_raise(arbitrary), runs_code]
-		/// Convert any Lua value at the given index to a string in a reasonable
-		/// format, and push that string onto the stack.
+		/// Converts any Lua value at the given index to a string in a reasonable
+		/// format, and pushes that string onto the stack.
 		/// 
 		/// The string created by the function is represented as the return value.
 		/// 
@@ -1076,9 +1045,9 @@ impl<'l> Managed<'l> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
-		pub fn to_string_meta(&mut self, index: c_int) -> &'l [u8] {
+		pub fn to_string_meta(&mut self, index: c_int) -> &[u8] {
 			let mut len = 0;
-			let str_ptr = unsafe { luaL_tolstring(self.l, index, &mut len as *mut _) };
+			let str_ptr = unsafe { luaL_tolstring(self.as_ptr(), index, &mut len as *mut _) };
 			unsafe { from_raw_parts(str_ptr as *const _, len) }
 		}
 	}

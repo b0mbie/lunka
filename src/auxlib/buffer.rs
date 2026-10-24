@@ -6,12 +6,12 @@ use core::{
 		self, Write,
 	},
 	marker::PhantomData,
-	mem::MaybeUninit,
+	ptr::null_mut,
 };
 
 use crate::{
 	cdef::auxlib::*,
-	Thread, Managed,
+	Thread,
 };
 
 /// String buffer that allows code to build Lua strings piecemeal.
@@ -22,7 +22,24 @@ pub struct Buffer<'l> {
 	thread: PhantomData<&'l mut Thread>,
 }
 
+const fn uninit_buffer() -> luaL_Buffer {
+	luaL_Buffer {
+		b: null_mut(),
+		size: 0,
+		n: 0,
+		L: null_mut(),
+		init: luaL_Buffer_init {
+			_alignment: [], b: [0; _],
+		},
+	}
+}
+
 impl<'l> Buffer<'l> {
+	/// Returns a mutable pointer to the inner [`luaL_Buffer`] structure.
+	pub const fn as_mut_ptr(&mut self) -> *mut luaL_Buffer {
+		&mut self.raw
+	}
+
 	const unsafe fn from_raw(raw: luaL_Buffer) -> Self {
 		Self {
 			raw,
@@ -30,34 +47,36 @@ impl<'l> Buffer<'l> {
 		}
 	}
 
-	fn new(lua: &'l mut Thread) -> Self {
-		let raw = unsafe {
-			let mut raw = MaybeUninit::<luaL_Buffer>::zeroed();
-			luaL_buffinit(lua.as_ptr(), raw.as_mut_ptr());
-			raw.assume_init()
-		};
-		unsafe { Self::from_raw(raw) }
+	/// # Safety
+	/// The returned buffer requires initialization before it can be used.
+	const unsafe fn uninit() -> Self {
+		unsafe { Self::from_raw(uninit_buffer()) }
 	}
 
-	fn with_capacity(lua: &'l mut Thread, capacity: usize) -> Self {
-		let raw = unsafe {
-			let mut raw = MaybeUninit::<luaL_Buffer>::zeroed();
-			luaL_buffinitsize(lua.as_ptr(), raw.as_mut_ptr(), capacity);
-			raw.assume_init()
-		};
-		unsafe { Self::from_raw(raw) }
+	/// # Safety
+	/// `self` must be uninitialized.
+	unsafe fn init_in(&mut self, lua: &'l mut Thread) {
+		unsafe { luaL_buffinit(lua.as_ptr(), self.as_mut_ptr()) };
+	}
+
+	/// # Safety
+	/// `self` must be uninitialized.
+	unsafe fn init_with_capacity_in(&mut self, lua: &'l mut Thread, capacity: usize) {
+		unsafe { luaL_buffinitsize(lua.as_ptr(), self.as_mut_ptr(), capacity) };
 	}
 	
-	fn finish(mut self) {
+	/// # Safety
+	/// `self` must not be used for any other operations after this call.
+	unsafe fn finish(&mut self) {
 		debug_assert!(
 			self.raw.n <= self.raw.size,
 			"buffer length is bigger than its capacity"
 		);
-		unsafe { luaL_pushresult(&mut self.raw) }
+		unsafe { luaL_pushresult(self.as_mut_ptr()) }
 	}
 
-	/// Allocate enough space in the buffer for a given number of C characters,
-	/// and return a pointer to it.
+	/// Allocates enough space in the buffer for a given number of C characters,
+	/// and returns a pointer to it.
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -65,11 +84,11 @@ impl<'l> Buffer<'l> {
 	/// # Safety
 	/// The returned pointer may only be used while the buffer is valid.
 	pub unsafe fn prep(&mut self, size: usize) -> *mut c_char {
-		unsafe { luaL_prepbuffsize(&mut self.raw, size) }
+		unsafe { luaL_prepbuffsize(self.as_mut_ptr(), size) }
 	}
 
-	/// Allocate enough space in the buffer for [`BUFFER_SIZE`] C characters,
-	/// and return a pointer to it.
+	/// Allocates enough space in the buffer for [`LUAL_BUFFERSIZE`] C characters,
+	/// and returns a pointer to it.
 	/// 
 	/// See also [`prep`](Self::prep).
 	/// 
@@ -79,17 +98,15 @@ impl<'l> Buffer<'l> {
 	/// # Safety
 	/// The returned pointer may only be used while the buffer is valid.
 	pub unsafe fn prep_default(&mut self) -> *mut c_char {
-		unsafe { self.prep(BUFFER_SIZE) }
+		unsafe { self.prep(LUAL_BUFFERSIZE) }
 	}
 
-	/// Get the current length of the buffer.
-	/// 
-	/// Equivalent to the C macro `luaL_bufflen`.
+	/// Returns the current length of the buffer.
 	pub const fn len(&self) -> usize {
 		self.raw.n
 	}
 
-	/// Set the current length of the buffer.
+	/// Sets the current length of the buffer.
 	/// 
 	/// # Safety
 	/// `len` must be less than or equal to the reported capacity,
@@ -98,12 +115,12 @@ impl<'l> Buffer<'l> {
 		self.raw.n = len
 	}
 
-	/// Return `true` if the buffer is empty.
+	/// Returns `true` if the buffer is empty.
 	pub const fn is_empty(&self) -> bool {
 		self.raw.n == 0
 	}
 
-	/// Get the current capacity of the buffer.
+	/// Returns the current capacity of the buffer.
 	pub const fn capacity(&self) -> usize {
 		self.raw.size
 	}
@@ -118,22 +135,20 @@ impl<'l> Buffer<'l> {
 		unsafe { Thread::from_ptr_mut(self.raw.L) }
 	}
 
-	/// Add one C character to the buffer.
-	/// 
-	/// Equivalent to the C macro `luaL_addchar`.
+	/// Adds one C character to the buffer.
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn add_char(&mut self, ch: c_char) {
 		let len = self.len();
 		if len >= self.capacity() {
-			unsafe { luaL_prepbuffsize(&mut self.raw, 1) };
+			unsafe { luaL_prepbuffsize(self.as_mut_ptr(), 1) };
 		}
 		unsafe { *self.raw.b.add(len) = ch }
 		unsafe { self.set_len(len.wrapping_add(1)) }
 	}
 
-	/// Add one byte to the buffer.
+	/// Adds one byte to the buffer.
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -141,43 +156,35 @@ impl<'l> Buffer<'l> {
 		self.add_char(b as _)
 	}
 
-	/// Remove a given number of C characters from the buffer.
-	/// 
-	/// Equivalent to the C macro `luaL_buffsub`.
+	/// Removes a given number of C characters from the buffer.
 	pub fn remove(&mut self, n: usize) {
 		unsafe { self.set_len(self.len().saturating_sub(n)) }
 	}
 
-	/// Add a string to the buffer.
-	/// 
-	/// Functionally equivalent to the function [`luaL_addlstring`].
+	/// Adds a string to the buffer.
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn add_string<S: AsRef<[u8]>>(&mut self, data: S) {
 		let data = data.as_ref();
 		unsafe { luaL_addlstring(
-			&mut self.raw,
+			self.as_mut_ptr(),
 			data.as_ptr() as *const _, data.len(),
 		) }
 	}
 
-	/// Add a C string to the buffer.
-	/// 
-	/// Equivalent to the function [`luaL_addstring`].
+	/// Adds a C string to the buffer.
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).
 	pub fn add_c_str(&mut self, data: &CStr) {
-		unsafe { luaL_addstring(&mut self.raw, data.as_ptr()) }
+		unsafe { luaL_addstring(self.as_mut_ptr(), data.as_ptr()) }
 	}
 
-	/// Convert a value on top of the associated Lua stack to a string, and pop
-	/// the result into the buffer.
-	/// 
-	/// Equivalent to the function [`luaL_addvalue`].
+	/// Converts a value on top of the associated Lua stack to a string,
+	/// and pops the result into the buffer.
 	pub fn add_value(&mut self) {
-		unsafe { luaL_addvalue(&mut self.raw) }
+		unsafe { luaL_addvalue(self.as_mut_ptr()) }
 	}
 }
 
@@ -195,23 +202,29 @@ impl fmt::Write for Buffer<'_> {
 	}
 }
 
-impl Managed<'_> {
+impl Thread {
 	/// Fills a [`Buffer`]
 	/// with the given closure
 	/// and pushes it onto the stack.
 	pub fn push_buffer<F: FnOnce(&mut Buffer<'_>)>(&mut self, f: F) {
-		let mut buffer = Buffer::new(self);
-		f(&mut buffer);
-		buffer.finish()
+		unsafe {
+			let mut buffer = Buffer::uninit();
+			buffer.init_in(self);
+			f(&mut buffer);
+			buffer.finish()
+		}
 	}
 
 	/// Fills a [`Buffer`] of a known capacity
 	/// with the given closure
 	/// and pushes it onto the stack.
 	pub fn push_buffer_with_capacity<F: FnOnce(&mut Buffer<'_>)>(&mut self, capacity: usize, f: F) {
-		let mut buffer = Buffer::with_capacity(self, capacity);
-		f(&mut buffer);
-		buffer.finish()
+		unsafe {
+			let mut buffer = Buffer::uninit();
+			buffer.init_with_capacity_in(self, capacity);
+			f(&mut buffer);
+			buffer.finish()
+		}
 	}
 
 	/// Pushes a [`Display`](fmt::Display) representation of `T` onto the stack

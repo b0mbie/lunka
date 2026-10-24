@@ -26,6 +26,10 @@ crate-type = ["cdylib"]
 name = "os2"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "userdata_lib"
+crate-type = ["cdylib"]
+
 [features]
 default = ["alloc", "auxlib", "stdlibs", "link-vendored-api-checks"]
 

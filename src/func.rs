@@ -1,5 +1,7 @@
 use core::{
-	ffi::c_int,
+	ffi::{
+		CStr, c_int,
+	},
 	marker::PhantomData,
 	mem::transmute,
 	ops::{
@@ -11,7 +13,8 @@ use crate::{
 	cdef::{
 		lua_State, lua_CFunction,
 	},
-	Thread, Managed,
+	util::lunka_attrs,
+	Thread,
 };
 
 impl Thread {
@@ -26,12 +29,48 @@ impl Thread {
 	pub fn push_function(&self, f: Func) {
 		self.push_c_function(to_c_function(f))
 	}
+
+	lunka_attrs! {
+		[may_raise(arbitrary), runs_code]
+		/// Sets the function `func` as the new value of global `name`,
+		/// calling metamethods for the global table, if there are any.
+		/// 
+		/// # Errors
+		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+		pub fn register(&mut self, name: &CStr, f: Func) {
+			self.register_c(name, to_c_function(f))
+		}
+	}
+
+	lunka_attrs! {
+		[may_raise(arbitrary), runs_code]
+		/// If `package.loaded[modname]` is not true, calls the function `open_fn`
+		/// with the string `module_name` as an argument and sets the call result to
+		/// `package.loaded[modname]`, as if that function has been called through
+		/// `require`.
+		/// 
+		/// This function leaves a copy of the module on the stack. 
+		/// 
+		/// If `into_global` is true, also stores the module into the global
+		/// `module_name`.
+		/// 
+		/// # Errors
+		/// The underlying Lua state may raise an arbitrary [error](crate::errors).
+		pub fn require(
+			&mut self,
+			module_name: &CStr,
+			open_fn: Func,
+			into_global: bool
+		) {
+			self.require_raw(module_name, to_c_function(open_fn), into_global)
+		}
+	}
 }
 
-impl Managed<'_> {
+impl Thread {
 	/// Push a new closure onto the stack.
 	/// 
-	/// See [`Managed::push_c_closure`] for more information.
+	/// See [`Thread::push_c_closure`] for more information.
 	pub fn push_closure(&mut self, f: Func, n_upvalues: c_int) {
 		self.push_c_closure(to_c_function(f), n_upvalues)
 	}
@@ -59,7 +98,7 @@ pub const fn to_c_function(f: Func) -> lua_CFunction {
 #[repr(transparent)]
 pub struct Ctx<'a> {
 	l: *mut lua_State,
-	_thread: PhantomData<&'a mut Thread>,
+	_t: PhantomData<&'a mut Thread>,
 }
 
 impl Deref for Ctx<'_> {
@@ -75,7 +114,7 @@ impl DerefMut for Ctx<'_> {
 }
 
 impl<'a> Ctx<'a> {
-	/// Converts this context into [`Thread`].
+	/// Converts this context into a mutable [`Thread`].
 	pub fn lua(self) -> &'a mut Thread {
 		unsafe { Thread::from_ptr_mut(self.l) }
 	}
@@ -169,7 +208,6 @@ macro_rules! func {
 /// # Safety
 /// `l` must be a valid pointer to a Lua state.
 pub extern "C-unwind" fn rust_panic_handler(mut lua: Ctx<'_>) -> Rets {
-	let mut lua = lua.managed();
 	let msg = if let Some(msg) = lua.to_string(-1) {
 		str::from_utf8(msg).unwrap_or("error object does not contain valid UTF-8")
 	} else {

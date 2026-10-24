@@ -33,11 +33,14 @@ mod gc_mode;
 pub use gc_mode::*;
 mod indices;
 pub use indices::*;
-mod managed;
-pub use managed::*;
+mod reader;
+pub use reader::*;
 mod state;
 pub use state::*;
 mod thread;
 pub use thread::*;
+mod writer;
+pub use writer::*;
 
 mod macros;
+mod managed;

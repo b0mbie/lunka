@@ -5,7 +5,7 @@ use crate::{
 		auxlib::*,
 		*,
 	},
-	Managed,
+	Thread,
 };
 
 mod array;
@@ -15,8 +15,8 @@ pub use erased::*;
 
 mod macros;
 
-/// Trait for collections of [`luaL_Reg`]
-/// that are used in [`Managed::new_lib`].
+/// Types that are collections of [`luaL_Reg`]
+/// which are used in [`Thread::new_lib`].
 /// 
 /// # Safety
 /// Every function must behave as documented.
@@ -35,7 +35,7 @@ pub unsafe trait Library {
 	fn as_ptr(&self) -> *const luaL_Reg;
 }
 
-impl Managed<'_> {
+impl Thread {
 	/// Creates a new table and registers there the functions in the given [`Library`].
 	/// 
 	/// _Unlike_ this function's C counterpart, this will _not_ call
@@ -56,7 +56,7 @@ impl Managed<'_> {
 	/// but does not actually store them.
 	/// 
 	/// This function is intended to be used in conjunction with
-	/// [`Managed::set_funcs`].
+	/// [`Thread::set_funcs`].
 	/// 
 	/// # Errors
 	/// The underlying Lua state may raise a memory [error](crate::errors).

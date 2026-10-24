@@ -14,7 +14,8 @@ use crate::{
 		*,
 	},
 	util::lunka_attrs,
-	Thread, Managed,
+	AcceptableIndex,
+	Thread,
 };
 
 mod buffer;
@@ -24,6 +25,8 @@ pub use library::*;
 mod options;
 pub use options::*;
 
+pub mod userdata;
+
 impl Thread {
 	/// Raises an error reporting a problem with argument `arg` of the C function
 	/// that called it, using a standard message that includes `extra_message`
@@ -32,7 +35,7 @@ impl Thread {
 	/// `bad argument #<argument> to '<function name>' (<message>)`
 	/// 
 	/// This function never returns. 
-	pub fn arg_error(&self, arg: c_int, extra_message: &CStr) -> ! {
+	pub fn arg_error(&self, arg: AcceptableIndex, extra_message: &CStr) -> ! {
 		unsafe { luaL_argerror(self.as_ptr_no_gc(), arg, extra_message.as_ptr()) }
 	}
 
@@ -44,7 +47,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg`'s type is incorrect.
-		pub fn check_any(&self, arg: c_int) {
+		pub fn check_any(&self, arg: AcceptableIndex) {
 			unsafe { luaL_checkany(self.as_ptr_no_gc(), arg) }
 		}
 	}
@@ -58,7 +61,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg`'s type is incorrect.
-		pub fn check_integer(&self, arg: c_int) -> Integer {
+		pub fn check_integer(&self, arg: AcceptableIndex) -> Integer {
 			unsafe { luaL_checkinteger(self.as_ptr_no_gc(), arg) }
 		}
 	}
@@ -71,7 +74,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string.
-		pub fn check_c_chars(&self, arg: c_int) -> &[c_char] {
+		pub fn check_c_chars(&mut self, arg: AcceptableIndex) -> &[c_char] {
 			let mut len = 0;
 			let str_ptr = unsafe { luaL_checklstring(self.as_ptr_no_gc(), arg, &mut len as *mut _) };
 			unsafe { from_raw_parts(str_ptr, len) }
@@ -86,7 +89,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string.
-		pub fn check_string(&self, arg: c_int) -> &[u8] {
+		pub fn check_string(&mut self, arg: AcceptableIndex) -> &[u8] {
 			let mut len = 0;
 			let str_ptr = unsafe { luaL_checklstring(self.as_ptr_no_gc(), arg, &mut len as *mut _) };
 			unsafe { from_raw_parts(str_ptr as *const _, len) }
@@ -101,7 +104,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg`'s type is incorrect.
-		pub fn check_number(&self, arg: c_int) -> Number {
+		pub fn check_number(&self, arg: AcceptableIndex) -> Number {
 			unsafe { luaL_checknumber(self.as_ptr_no_gc(), arg) }
 		}
 	}
@@ -123,7 +126,7 @@ impl Thread {
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` is not a string or if the string cannot be found in `list`. 
 		pub fn check_option<const N: usize>(
-			&self, arg: c_int,
+			&self, arg: AcceptableIndex,
 			default: Option<&CStr>,
 			list: &AuxOptions<'_, N>
 		) -> usize {
@@ -163,7 +166,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string.
-		pub fn check_c_str(&self, arg: c_int) -> &CStr {
+		pub fn check_c_str(&mut self, arg: AcceptableIndex) -> &CStr {
 			let str_ptr = unsafe { luaL_checkstring(self.as_ptr_no_gc(), arg) };
 			unsafe { CStr::from_ptr(str_ptr) }
 		}
@@ -178,7 +181,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg`'s type is incorrect.
-		pub fn check_type(&self, arg: c_int, type_tag: Type) {
+		pub fn check_type(&self, arg: AcceptableIndex, type_tag: Type) {
 			unsafe { luaL_checktype(self.as_ptr_no_gc(), arg, type_tag as _) }
 		}
 	}
@@ -186,7 +189,7 @@ impl Thread {
 	lunka_attrs! {
 		[may_raise(arbitrary)]
 		/// Checks whether the function argument `arg` is a userdata of the type
-		/// `table_name` (see also [`Managed::new_metatable`]) and return the
+		/// `table_name` (see also [`Thread::new_metatable`]) and return the
 		/// userdata's memory-block address (see [`Thread::to_userdata`]).
 		/// 
 		/// # Errors
@@ -199,7 +202,7 @@ impl Thread {
 		/// While the metatable of userdata is protected from modification in the Lua standard library,
 		/// an unsound implementation of setting the metatable of an object in Lua could change a userdatum's metatable
 		/// and make the check for the `table_name` metatable unsound.
-		pub unsafe fn check_udata(&self, arg: c_int, table_name: &CStr) -> NonNull<c_void> {
+		pub unsafe fn check_udata_raw(&self, arg: AcceptableIndex, table_name: &CStr) -> NonNull<c_void> {
 			unsafe { NonNull::new_unchecked(luaL_checkudata(self.as_ptr_no_gc(), arg, table_name.as_ptr())) }
 		}
 	}
@@ -275,7 +278,7 @@ impl Thread {
 	lunka_attrs! {
 		[may_raise(memory)]
 		/// Pushes onto the stack the metatable associated with the name `table_name`
-		/// in the registry (see also [`Managed::new_metatable`]), or `nil` if there
+		/// in the registry (see also [`Thread::new_metatable`]), or `nil` if there
 		/// is no metatable associated with that name, and returns the type of the
 		/// pushed value.
 		/// 
@@ -296,7 +299,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a number, isn't a `nil` and not absent.
-		pub fn opt_integer(&self, arg: c_int, default: Integer) -> Integer {
+		pub fn integer_or(&self, arg: AcceptableIndex, default: Integer) -> Integer {
 			unsafe { luaL_optinteger(self.as_ptr_no_gc(), arg, default) }
 		}
 	}
@@ -306,13 +309,13 @@ impl Thread {
 		/// If the function argument `arg` is a string,
 		/// returns this string, or returns `default`.
 		/// 
-		/// This function works like [`Thread::opt_string`].
+		/// This function works like [`Thread::c_str_or`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string, isn't a `nil` and not absent.
-		pub fn opt_c_chars<'l>(
-			&'l self, arg: c_int, default: &'l CStr
+		pub fn c_chars_or<'l>(
+			&'l self, arg: AcceptableIndex, default: &'l CStr
 		) -> &'l [c_char] {
 			let mut len = 0;
 			let str_ptr = unsafe { luaL_optlstring(
@@ -328,12 +331,12 @@ impl Thread {
 		/// If the function argument `arg` is a string,
 		/// returns this string, or returns `default`.
 		/// 
-		/// This function works like [`Thread::opt_string`].
+		/// This function works like [`Thread::string_or`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string, isn't a `nil` and not absent.
-		pub fn opt_c_str<'l>(&'l self, arg: c_int, default: &'l CStr) -> &'l CStr {
+		pub fn c_str_or<'l>(&'l self, arg: AcceptableIndex, default: &'l CStr) -> &'l CStr {
 			unsafe { CStr::from_ptr(
 				luaL_optstring(self.as_ptr_no_gc(), arg, default.as_ptr())
 			) }
@@ -345,13 +348,13 @@ impl Thread {
 		/// If the function argument `arg` is a string,
 		/// returns this string, or returns `default`.
 		/// 
-		/// This function uses [`Managed::to_string`] to get its result, so all
+		/// This function uses [`Thread::to_string`] to get its result, so all
 		/// conversions and caveats of that function apply here. 
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a string, isn't a `nil` and not absent.
-		pub fn opt_string<'l>(&'l self, arg: c_int, default: &'l [u8]) -> &'l [u8] {
+		pub fn string_or<'l>(&'l self, arg: AcceptableIndex, default: &'l [u8]) -> &'l [u8] {
 			let mut len = 0;
 			let str_ptr = unsafe { luaL_optlstring(
 				self.as_ptr_no_gc(), arg, default.as_ptr() as *const _,
@@ -369,7 +372,7 @@ impl Thread {
 		/// # Errors
 		/// The underlying Lua state may raise an [error](crate::errors) if the
 		/// argument `arg` isn't a number, isn't a `nil` and not absent.
-		pub fn opt_number(&self, arg: c_int, default: Number) -> Number {
+		pub fn number_or(&self, arg: AcceptableIndex, default: Number) -> Number {
 			unsafe { luaL_optnumber(self.as_ptr_inspect(), arg, default) }
 		}
 	}
@@ -382,7 +385,7 @@ impl Thread {
 	/// Sets the metatable of the object on the top of the stack as the metatable
 	/// associated with name `table_name` in the registry.
 	/// 
-	/// See also [`Managed::new_metatable`].
+	/// See also [`Thread::new_metatable`].
 	pub fn set_aux_metatable(&self, table_name: &CStr) {
 		unsafe { luaL_setmetatable(self.as_ptr_no_gc(), table_name.as_ptr()) }
 	}
@@ -396,7 +399,7 @@ impl Thread {
 	/// While the metatable of userdata is protected from modification in the Lua standard library,
 	/// an unsound implementation of setting the metatable of an object in Lua could change a userdatum's metatable
 	/// and make the check for the `table_name` metatable unsound.
-	pub unsafe fn test_udata(&self, arg: c_int, table_name: &CStr) -> Option<NonNull<c_void>> {
+	pub unsafe fn test_udata_raw(&self, arg: AcceptableIndex, table_name: &CStr) -> Option<NonNull<c_void>> {
 		NonNull::new(unsafe {luaL_testudata(self.as_ptr_inspect(), arg, table_name.as_ptr())})
 	}
 
@@ -405,7 +408,7 @@ impl Thread {
 	/// `type_name` is a "name" for the expected type.
 	/// 
 	/// This function never returns.
-	pub fn type_error(&self, arg: c_int, type_name: &CStr) -> ! {
+	pub fn type_error(&self, arg: AcceptableIndex, type_name: &CStr) -> ! {
 		unsafe { luaL_typeerror(self.as_ptr_no_gc(), arg, type_name.as_ptr()) }
 	}
 
@@ -422,13 +425,13 @@ impl Thread {
 	/// collected.
 	/// The reference `ref_idx` is also freed to be used again.
 	/// 
-	/// See also [`Managed::create_ref`].
-	pub fn destroy_ref(&self, store_index: c_int, ref_idx: c_int) {
+	/// See also [`Thread::create_ref`].
+	pub fn destroy_ref(&self, store_index: c_int, ref_idx: Ref) {
 		unsafe { luaL_unref(self.as_ptr_no_gc(), store_index, ref_idx) }
 	}
 }
 
-impl Managed<'_> {
+impl Thread {
 	lunka_attrs! {
 		[may_raise(memory)]
 		/// Loads a buffer as a Lua chunk.
@@ -534,7 +537,7 @@ impl Managed<'_> {
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
-		pub fn create_ref(&mut self, store_index: c_int) -> c_int {
+		pub fn create_ref(&mut self, store_index: c_int) -> Ref {
 			unsafe { luaL_ref(self.as_ptr(), store_index) }
 		}
 	}
@@ -566,7 +569,7 @@ impl Managed<'_> {
 		[may_raise(memory)]
 		/// Creates and pushes a traceback of the stack of this thread to its own stack.
 		/// 
-		/// This function works like [`Managed::traceback`].
+		/// This function works like [`Thread::traceback`].
 		/// 
 		/// # Errors
 		/// The underlying Lua state may raise a memory [error](crate::errors).
@@ -600,3 +603,5 @@ impl Managed<'_> {
 		}
 	}
 }
+
+pub type Ref = c_int;

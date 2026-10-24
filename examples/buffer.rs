@@ -3,7 +3,6 @@ use lunka::prelude::*;
 fn main() {
 	let mut lua = Lua::new();
 
-	let mut lua = lua.managed();
 	macro_rules! check_buffer {
 		($fill:expr, $target:expr) => {{
 			lua.push_buffer($fill);
