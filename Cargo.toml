@@ -3,7 +3,7 @@ name = "lunka"
 description = "Pretty thin bindings to Lua 5.4"
 authors = ["[aka]bomb"]
 license = "MIT"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2024"
 repository = "https://github.com/b0mbie/lunka"
 documentation = "https://docs.rs/lunka"
@@ -15,31 +15,27 @@ version = "54.8.0"
 optional = true
 
 [[example]]
-name = "buffer"
-
-[[example]]
 name = "entrypoint"
 crate-type = ["cdylib"]
-
-[[example]]
-name = "hello"
 
 [[example]]
 name = "hello_lib"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "interpreter"
-
-[[example]]
 name = "os2"
 crate-type = ["cdylib"]
 
 [features]
-default = ["alloc", "auxlib", "stdlibs", "link-vendored"]
+default = ["alloc", "auxlib", "stdlibs", "link-vendored-api-checks"]
 
 # Use Rust's `alloc` crate.
 alloc = []
+
+# Unsafely assume consistency checks in the C API (using the `LUA_USE_APICHECK` define).
+unsafe-assume-api-checks = []
+
+link-vendored-api-checks = ["link-vendored", "unsafe-assume-api-checks"]
 
 # Use definitions for 32 bits max.
 # This is analogous to the `LUA_32BITS` define, and should be set appropriately

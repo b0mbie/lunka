@@ -1,8 +1,11 @@
 fn main() {
 	#[cfg(feature = "link-vendored")]
 	{
-		::lunka_src::Build::for_current()
-			.add_lunka_src()
-			.compile("lua");
+		let mut lua = ::lunka_src::Build::for_current();
+		lua.add_lunka_src();
+		if cfg!(feature = "link-vendored-api-checks") {
+			lua.api_checks();
+		}
+		lua.compile("lua");
 	}
 }
