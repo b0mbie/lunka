@@ -13,9 +13,9 @@ fn main() {
 
 	check_buffer!(|_| {}, b"");
 	check_buffer!(|b| b.add_c_str(c"not your business"), b"not your business");
-	check_buffer!(|b| {
-		b.add_string("not your ");
-		b.add_byte(b'b');
+	check_buffer!(|mut b| {
+		b.as_mut().add_string("not your ");
+		b.as_mut().add_byte(b'b');
 		b.add_c_str(c"usiness");
 	}, b"not your business");
 	check_buffer!(
