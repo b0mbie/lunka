@@ -184,12 +184,12 @@ impl<const ID_SIZE: usize> fmt::Debug for DebugInfo<ID_SIZE> {
 		}
 
 		f.write_str("DebugInfo<")?;
+		ID_SIZE.fmt(f)?;
 		if ID_SIZE == DEFAULT_ID_SIZE {
-			f.write_str("DEFAULT_ID_SIZE")
-		} else {
-			ID_SIZE.fmt(f)
-		}?;
+			f.write_str(" == DEFAULT_ID_SIZE")?;
+		}
 		f.write_str(">")?;
+
 		f.debug_struct("")
 			.field("event", &self.event())
 			.field("name", &self.name())
