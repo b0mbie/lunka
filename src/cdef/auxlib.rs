@@ -293,11 +293,10 @@ pub unsafe fn luaL_pushfail(l: *mut lua_State) {
 }
 
 /// Initial buffer size used by the buffer system, for [`luaL_Buffer`].
-/// Also known as `LUAL_BUFFERSIZE`.
 /// 
 /// This cannot be changed for Lua that's already compiled.
 // TODO: Does it make sense to ever change this?
-pub const BUFFER_SIZE: usize =
+pub const LUAL_BUFFERSIZE: usize =
 	16 * size_of::<*mut c_void>() * size_of::<Number>();
 
 /// String buffer that allows code to build Lua strings piecemeal.
@@ -315,9 +314,9 @@ pub struct luaL_Buffer {
 #[repr(C)] // Can't be `transparent` because `_alignment` is not 1-aligned.
 pub struct luaL_Buffer_init {
 	pub _alignment: [MaxAlign; 0],
-	pub b: [c_char; BUFFER_SIZE],
+	pub b: [c_char; LUAL_BUFFERSIZE],
 }
 const _: () = assert!(
-	size_of::<luaL_Buffer_init>() == size_of::<[c_char; BUFFER_SIZE]>(),
+	size_of::<luaL_Buffer_init>() == size_of::<[c_char; LUAL_BUFFERSIZE]>(),
 	"`luaL_Buffer_init` could not be properly aligned; this is a bug!",
 );
