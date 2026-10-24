@@ -12,6 +12,8 @@ impl From<NonZero<c_int>> for AbsIndex {
 	}
 }
 impl AbsIndex {
+	pub const ONE: Self = Self::new(1).unwrap();
+
 	pub const fn new(index: c_int) -> Option<Self> {
 		if index >= 1 {
 			unsafe { Some(Self(NonZero::new_unchecked(index))) }
